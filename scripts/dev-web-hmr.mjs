@@ -112,12 +112,18 @@ function clearViteCache() {
 
 clearViteCache();
 
-const api = run('api', 'bun', ['run', '--cwd', 'packages/web', 'dev:server:watch'], {
-  OPENCHAMBER_PORT: backendPort,
-  // Dev backends share the relay identity with the production instance; never
-  // let them capture the machine's relay host on their own.
-  OPENCHAMBER_RELAY_HOST: process.env.OPENCHAMBER_RELAY_HOST || 'off',
-});
+const api = run(
+  'api',
+  'bun',
+  ['x', 'nodemon', '--watch', 'server', '--ext', 'js', '--exec', `bun server/index.js --port ${backendPort}`],
+  {
+    OPENCHAMBER_PORT: backendPort,
+    // Dev backends share the relay identity with the production instance; never
+    // let them capture the machine's relay host on their own.
+    OPENCHAMBER_RELAY_HOST: process.env.OPENCHAMBER_RELAY_HOST || 'off',
+  },
+  { cwd: webRoot },
+);
 const vite = run(
   'vite',
   'bun',

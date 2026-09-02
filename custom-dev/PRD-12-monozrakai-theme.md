@@ -1,0 +1,64 @@
+---
+id: PRD-12
+title: Monozrakai theme
+status: draft
+created: 2026-09-02
+related:
+  - PRD-11
+---
+
+# PRD-12 — Monozrakai theme
+
+## Goal
+
+Add a "Monozrakai" theme derived from Monokai — one dark and one light variant
+available under that name — with the dark background colors just slightly
+warmer/browner than stock Monokai. The warm-up is iterative: adjusted step by
+step from the user's visual feedback. The theme also carries the PRD-11
+tool-prefix palette on the dark variant.
+
+## Background
+
+Themes are JSON files in `lib/theme/themes/` (`metadata` id/name/variant +
+`colors`), registered in `presets.ts`. `monokai-dark.json` /
+`monokai-light.json` are the source themes.
+
+## Requirements
+
+- New `monozrakai-dark.json` / `monozrakai-light.json`:
+  - ids `monozrakai-dark` / `monozrakai-light`
+  - name "Monozrakai" (both variants share the name, matching how Monokai's
+    variants do)
+  - variant `dark` / `light`
+- Register both in `lib/theme/themes/presets.ts` so they appear in the theme
+  picker (the `themes` index in `lib/theme/themes/index.ts` picks up presets).
+- **Light**: direct clone of `monokai-light.json` for now.
+- **Dark**: clone of `monokai-dark.json`, then nudge the background colors
+  slightly warmer/browner. Small, deliberate steps; the user inspects visually
+  and we iterate until it feels right.
+- **Dark** also defines `tools.label.<kind>` per PRD-11 (danger /
+  benign-change / read-search / web / ai) and `tools.label.thinking`.
+
+## Iteration process
+
+The warm-up is a feedback loop:
+
+1. Adjust a few hex values (background, muted, elevated, subtle, tool
+   backgrounds, syntax background).
+2. User inspects on screen.
+3. Adjust again. Repeat.
+
+The PRD-11 token system keeps tool-color tweaks JSON-only, so iteration never
+needs code changes.
+
+## Acceptance criteria
+
+- Both variants list under "Monozrakai" in the theme picker.
+- Dark backgrounds are slightly warmer/browner than Monokai (subject to
+  iteration).
+- Tool prefix colors render on Monozrakai dark (requires PRD-11).
+
+## Out of scope / future
+
+- Changing the stock Monokai themes.
+- Layout or non-background changes.
