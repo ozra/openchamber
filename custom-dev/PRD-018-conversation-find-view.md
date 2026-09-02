@@ -160,6 +160,8 @@ that same entry produce a count badge rather than duplicate rows.
   preview when it expands the rail into the trajectory timeline.
 - Clicking or pressing Enter scrolls Chat to the matching entry without closing
   Find or resetting its query, filters, ordering, selection, or result scroll.
+- Double clicking or ctrl+enter does as above, but also closes/hides the find
+  view, considering it "job done".
 - Highlight the selected search phrase in the target chat entry. For regex,
   highlight the concrete matched range, not the pattern text.
 - Scope transcript highlighting to the selected result rather than painting all
@@ -168,6 +170,10 @@ that same entry produce a count badge rather than duplicate rows.
   changing unrelated expansion state.
 - Clear rail preview and transcript highlight when the query clears, Find
   closes, session changes, or the selected result becomes invalid.
+- Loose idea - refine further: perhaps match highlights should continue to be
+  highlighted for a certain time (preferably settings option), and then fade
+  until not highlighted, after find view has been closed (whichever way it was
+  closed)
 
 ## Ctrl+F and other entry points
 
