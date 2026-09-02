@@ -6,6 +6,15 @@ OpenChamber provides shared web, desktop, VS Code, hosted-mobile, and native-mob
 
 This file contains only always-on repository rules and routing. Detailed workflows belong to project skills and module documentation.
 
+## Fork-local requirements
+
+`custom-dev/` is the maintainer's personal PRD backlog for OpenChamber
+customizations. Before any fork-local work — refining or adding a PRD,
+implementing a customized feature, or touching `custom-dev/` — read
+`custom-dev/README.md` and the PRD files under `custom-dev/` (the PRDs are the
+live index). When several PRDs share a theme, a PRD marked `kind: epic`
+coordinates them; check for one before adding special-case rules.
+
 ## Instruction Order
 
 These steps are mandatory. Before editing, you **MUST**:

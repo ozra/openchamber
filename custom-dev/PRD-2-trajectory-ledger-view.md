@@ -5,6 +5,7 @@ status: draft
 created: 2026-09-01
 related:
   - PRD-1
+  - PRD-16
 ---
 
 # PRD-2 — Trajectory ledger view

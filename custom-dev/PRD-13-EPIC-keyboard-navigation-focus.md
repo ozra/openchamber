@@ -1,13 +1,30 @@
 ---
 id: PRD-13
 title: Keyboard navigation and focus
+kind: epic
 status: draft
 created: 2026-09-02
 related:
   - PRD-7
+  - PRD-10
 ---
 
 # PRD-13 — Keyboard navigation and focus
+
+> **Epic.** This PRD coordinates keyboard and navigation work across several
+> requirement docs. Before implementing or adding any keyboard/navigation
+> feature (shortcut, focus handling, picker entry point), read this PRD and
+> check the related list below so the change follows the shared patterns
+> instead of becoming a special case. Feature-level details live in their own
+> PRDs; this one holds the cross-cutting rules.
+
+## Related PRDs
+
+| PRD | Scope |
+|---|---|
+| PRD-7 | Chat history scroll shortcut (Ctrl+Shift+PageUp/Down) — a constituent of this epic |
+| PRD-10 | Interface zoom shortcuts (Ctrl + / Ctrl - / Ctrl 0) |
+| (future) | New keyboard features should register here before being built |
 
 ## Goal
 
@@ -42,7 +59,7 @@ is identical no matter how the picker is reached.
   `lib/settings/metadata.ts:100-104`) opens Settings → OpenCode → Agents — it
   reads like a picker but is settings navigation.
 - **Chat history scroll**: `Ctrl+Shift+PageUp/Down` from composer focus is
-  PRD-7 (draft), absorbed into this PRD.
+  PRD-7 (a constituent of this epic).
 
 ## Requirements
 
@@ -72,7 +89,7 @@ is identical no matter how the picker is reached.
 
 5. **Chat history scroll from composer focus**
    - `Ctrl+Shift+PageUp` / `Ctrl+Shift+PageDown` scroll chat history even when
-     the composer is focused (absorbs PRD-7).
+     the composer is focused (PRD-7).
 
 6. **Invoke consistency (cross-cutting)**
    - Every picker reachable from an icon, a shortcut, and the palette opens the

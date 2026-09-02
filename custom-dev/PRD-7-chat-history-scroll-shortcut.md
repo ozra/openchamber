@@ -1,15 +1,16 @@
 ---
 id: PRD-7
 title: Chat history scroll shortcut
-status: closed
+status: draft
 created: 2026-09-01
-superseded-by: PRD-13
+related:
+  - PRD-13
 ---
 
 # PRD-7 — Chat history scroll shortcut
 
-> Superseded by PRD-13 (Keyboard navigation and focus), which absorbs this
-> requirement.
+> A constituent of the PRD-13 keyboard epic; implemented under that
+> coordination.
 
 ## Goal
 

@@ -10,11 +10,15 @@ track, and (where feasible) later turn into upstreamable modules.
 
 ## How to use this directory
 
-- `PRD-*.md` — one requirement document per feature. Numbered for easy reference:
-  `PRD-1-foo-bar.md`, `PRD-2-baz.md`, ...
+- `PRD-*.md` — one requirement document per feature. Numbered for easy
+  reference, with the kind in the name when coordinating: `PRD-1-foo-bar.md`,
+  `PRD-13-EPIC-keyboard-navigation-focus.md`. The files themselves are the live
+  index — there is no PRD list in this README; find them by `glob custom-dev/*.md`.
+- `done/` — PRDs that reached a terminal state (`done` / `closed`)
+  move here when they reach that state, keeping the working set clean.
 - `DOCUMENTATION.md` — the shared technical design: data model, projection
   algorithms, layout rules. PRDs describe *what*; this describes *how*.
-- `README.md` — this index.
+- `README.md` — this file: the ways of working, not an index.
 
 ## PRD format and status
 
@@ -24,11 +28,11 @@ Every PRD starts with YAML frontmatter:
 ---
 id: PRD-13
 title: Keyboard navigation and focus
+kind: epic            # optional: coordinating doc for several related PRDs
 status: draft
 created: 2026-09-02
 related:
   - PRD-7
-superseded-by: PRD-13   # only on closed PRDs
 ---
 ```
 
@@ -46,25 +50,20 @@ Status lives in frontmatter only (not in the body). Lifecycle:
 
 Normal flow: `draft` → `discover` (when needed) → `ready` → `in-progress` →
 `done`. `closed` and `deferred` are end/park states; superseded work points at
-the PRD that replaced it.
+the PRD that replaced it. On reaching a terminal state, move the file into
+`done/`.
 
-## PRD index
+## Epics
 
-| ID | Title | Status |
-|---|---|---|
-| PRD-1 | Trajectory timeline scrollbar | Draft |
-| PRD-2 | Trajectory ledger view | Draft |
-| PRD-3 | Chat user messages always shown in full | Done |
-| PRD-4 | Diff view font size setting | Draft |
-| PRD-5 | Statusbar consolidation | Deferred |
-| PRD-6 | Agent modes: read / write / full | Draft |
-| PRD-7 | Chat history scroll shortcut (Ctrl+Shift+PageUp/Down) | Closed — superseded by PRD-13 |
-| PRD-8 | Working / activity indicator animation | Discover |
-| PRD-9 | Reasoning visibility in chat | Discover |
-| PRD-10 | Interface zoom shortcuts (Ctrl + / Ctrl - / Ctrl 0) | Draft |
-| PRD-11 | Tool prefix tag colors | Draft |
-| PRD-12 | Monozrakai theme | Draft |
-| PRD-13 | Keyboard navigation and focus | Draft |
+When several PRDs share one theme, mark the coordinating PRD `kind: epic` and
+put `-EPIC-` in its filename after the id-number. The epic holds the cross-
+cutting rules and a "Related PRDs" list; the individual PRDs carry their own
+detail and a `related` back-reference. Before implementing a feature in an
+epic's theme, read the epic so the change follows the shared pattern instead
+of becoming a special case.
+
+Find epics by scanning frontmatter (`grep -l "kind: epic" custom-dev/*.md`) —
+there is no maintained list to go stale.
 
 ## Cross-cutting note on data reality
 
@@ -80,3 +79,10 @@ the full model.
 PRD-13 sets the rule: a function opened from an icon, a shortcut, or the command
 palette always opens the same picker. Picker-specific improvements are done on
 the picker itself, so the behavior is identical regardless of entry point.
+
+## Cross-cutting note on right-side views
+
+PRD-16 defines the horizontal-stack model for right-side views: they toggle
+(not switch), double-click isolates, space pressure collapses in a
+deterministic order with chat as the last survivor. PRD-1 (trajectory rail),
+PRD-2 (ledger), and any future right-side view must fit this model.

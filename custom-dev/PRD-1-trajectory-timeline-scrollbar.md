@@ -5,6 +5,7 @@ status: draft
 created: 2026-09-01
 related:
   - PRD-2
+  - PRD-16
 ---
 
 # PRD-1 — Trajectory timeline scrollbar
