@@ -7,6 +7,7 @@ created: 2026-09-02
 related:
   - PRD-007
   - PRD-010
+  - PRD-018
 ---
 
 # PRD-013 — Keyboard navigation and focus
@@ -24,6 +25,7 @@ related:
 |---|---|
 | PRD-007 | Chat history scroll shortcut (Ctrl+Shift+PageUp/Down) — a constituent of this epic |
 | PRD-010 | Interface zoom shortcuts (Ctrl + / Ctrl - / Ctrl 0) |
+| PRD-018 | Complete conversation search in the timeline, including configurable contextual Ctrl+F |
 | (future) | New keyboard features should register here before being built |
 
 ## Goal
