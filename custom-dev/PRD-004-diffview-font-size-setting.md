@@ -1,13 +1,13 @@
 ---
-id: PRD-4
+id: PRD-004
 title: Diff view font size setting
 status: draft
 created: 2026-09-01
 related:
-  - PRD-10
+  - PRD-010
 ---
 
-# PRD-4 — Diff view font size (zoom-aware relative override)
+# PRD-004 — Diff view font size (zoom-aware relative override)
 
 ## Goal
 
@@ -19,7 +19,7 @@ chat/typography scaling — while keeping it zoom-aware, never rigid.
 Diff code resolves `var(--text-code)` (`PierreDiffViewer.tsx:55-77`,
 `index.css:704`), which the global interface font-size percentage scales
 (`applyTypography`, `useUIStore.ts:2025-2049`). There is no independent control.
-Because the app zoom (PRD-10) scales `--text-code`, an absolute pinned font
+Because the app zoom (PRD-010) scales `--text-code`, an absolute pinned font
 size would stop tracking zoom; the override is therefore a **relative offset**,
 so diffs keep following the scale.
 

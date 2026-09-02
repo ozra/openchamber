@@ -1,11 +1,11 @@
 ---
-id: PRD-14
+id: PRD-014
 title: Sidebar close-after-use and hide new-session
 status: draft
 created: 2026-09-02
 ---
 
-# PRD-14 — Sidebar close-after-use and hide new-session
+# PRD-014 — Sidebar close-after-use and hide new-session
 
 ## Goal
 

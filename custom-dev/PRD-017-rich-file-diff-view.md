@@ -1,13 +1,13 @@
 ---
-id: PRD-17
+id: PRD-017
 title: Rich file-diff view
 status: draft
 created: 2026-09-02
 related:
-  - PRD-4
+  - PRD-004
 ---
 
-# PRD-17 — Rich file-diff view
+# PRD-017 — Rich file-diff view
 
 ## Goal
 

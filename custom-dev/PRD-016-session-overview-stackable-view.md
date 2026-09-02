@@ -1,14 +1,14 @@
 ---
-id: PRD-16
+id: PRD-016
 title: Session overview as a stackable view
 status: draft
 created: 2026-09-02
 related:
-  - PRD-1
-  - PRD-2
+  - PRD-001
+  - PRD-002
 ---
 
-# PRD-16 — Session overview as a stackable view
+# PRD-016 — Session overview as a stackable view
 
 ## Goal
 
@@ -21,8 +21,8 @@ The right-hand area should host several views that can sit side by side when
 space allows:
 
 - chat view
-- trajectory timeline rail / "miniview" (PRD-1)
-- trajectory ledger (PRD-2)
+- trajectory timeline rail / "miniview" (PRD-001)
+- trajectory ledger (PRD-002)
 - changed files
 - session overview (this PRD)
 
@@ -36,7 +36,7 @@ Behavior:
 - Each view keeps its intended width; the session overview keeps its sleek thin
   width.
 
-This PRD is scoped to the **session overview** view. PRD-1 (rail) and PRD-2
+This PRD is scoped to the **session overview** view. PRD-001 (rail) and PRD-002
 (ledger) are separate, but implementation must keep this horizontal-stack model
 in mind so nothing is built in a way that clashes with the full vision. Do not
 treat any of these views as a "mode" that excludes the others.
@@ -85,6 +85,6 @@ treat any of these views as a "mode" that excludes the others.
 
 ## Out of scope / future
 
-- Building the rail or ledger themselves (PRD-1 / PRD-2) — this only defines
+- Building the rail or ledger themselves (PRD-001 / PRD-002) — this only defines
   how they coexist.
 - Redesigning chat.

@@ -11,8 +11,8 @@ track, and (where feasible) later turn into upstreamable modules.
 ## How to use this directory
 
 - `PRD-*.md` — one requirement document per feature. Numbered for easy
-  reference, with the kind in the name when coordinating: `PRD-1-foo-bar.md`,
-  `PRD-13-EPIC-keyboard-navigation-focus.md`. The files themselves are the live
+  reference, with the kind in the name when coordinating: `PRD-001-foo-bar.md`,
+  `PRD-013-EPIC-keyboard-navigation-focus.md`. The files themselves are the live
   index — there is no PRD list in this README; find them by `glob custom-dev/*.md`.
 - `done/` — PRDs that reached a terminal state (`done` / `closed`)
   move here when they reach that state, keeping the working set clean.
@@ -26,13 +26,13 @@ Every PRD starts with YAML frontmatter:
 
 ```yaml
 ---
-id: PRD-13
+id: PRD-013
 title: Keyboard navigation and focus
 kind: epic            # optional: coordinating doc for several related PRDs
 status: draft
 created: 2026-09-02
 related:
-  - PRD-7
+  - PRD-007
 ---
 ```
 
@@ -76,13 +76,13 @@ the full model.
 
 ## Cross-cutting note on pickers
 
-PRD-13 sets the rule: a function opened from an icon, a shortcut, or the command
+PRD-013 sets the rule: a function opened from an icon, a shortcut, or the command
 palette always opens the same picker. Picker-specific improvements are done on
 the picker itself, so the behavior is identical regardless of entry point.
 
 ## Cross-cutting note on right-side views
 
-PRD-16 defines the horizontal-stack model for right-side views: they toggle
+PRD-016 defines the horizontal-stack model for right-side views: they toggle
 (not switch), double-click isolates, space pressure collapses in a
-deterministic order with chat as the last survivor. PRD-1 (trajectory rail),
-PRD-2 (ledger), and any future right-side view must fit this model.
+deterministic order with chat as the last survivor. PRD-001 (trajectory rail),
+PRD-002 (ledger), and any future right-side view must fit this model.

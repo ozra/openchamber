@@ -1,11 +1,11 @@
 ---
-id: PRD-6
+id: PRD-006
 title: Agent modes: read / write / full
 status: draft
 created: 2026-09-01
 ---
 
-# PRD-6 — Agent modes: read / write / full
+# PRD-006 — Agent modes: read / write / full
 
 ## Goal
 

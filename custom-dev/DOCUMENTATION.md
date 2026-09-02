@@ -1,8 +1,8 @@
 # custom-dev — Technical design (shared)
 
 This is the shared implementation detail for the PRDs in this directory. It
-focuses on the data model and algorithms that PRD-1 (timeline scrollbar) and
-PRD-2 (ledger view) both build on, plus general design rules.
+focuses on the data model and algorithms that PRD-001 (timeline scrollbar) and
+PRD-002 (ledger view) both build on, plus general design rules.
 
 ## Data model
 
@@ -68,7 +68,7 @@ measured throughput.
 
 Clicking a span/line scrolls the chat to that message, reusing the existing
 on-select-turn jump from `PromptNavigatorRail`. Bidirectional rail ⇄ ledger ⇄
-chat sync is a later phase (see PRD-2).
+chat sync is a later phase (see PRD-002).
 
 ## Styling
 

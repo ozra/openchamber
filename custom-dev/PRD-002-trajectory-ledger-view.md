@@ -1,14 +1,14 @@
 ---
-id: PRD-2
+id: PRD-002
 title: Trajectory ledger view
 status: draft
 created: 2026-09-01
 related:
-  - PRD-1
-  - PRD-16
+  - PRD-001
+  - PRD-016
 ---
 
-# PRD-2 — Trajectory ledger view
+# PRD-002 — Trajectory ledger view
 
 ## Goal
 
@@ -33,7 +33,7 @@ This feature is a separate, purpose-built view.
 
 ### Navigation sync (later)
 
-- Clicking or selecting a range in the trajectory timeline scrollbar (PRD-1)
+- Clicking or selecting a range in the trajectory timeline scrollbar (PRD-001)
   must reflect in both the trajectory ledger and the chat.
 - Selecting a line in the ledger reflects in the chat (and rail).
 - This is a later phase; the initial version may be read-only.
@@ -41,7 +41,7 @@ This feature is a separate, purpose-built view.
 ## Acceptance criteria
 
 - All entry kinds render as one-line rows with kind-appropriate detail.
-- Lines are identifiable by the same kind/lane conventions as the rail (PRD-1).
+- Lines are identifiable by the same kind/lane conventions as the rail (PRD-001).
 - The view does not modify the existing Raw Messages pane.
 
 ## Out of scope / future

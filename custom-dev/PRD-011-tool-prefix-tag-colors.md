@@ -1,13 +1,13 @@
 ---
-id: PRD-11
+id: PRD-011
 title: Tool prefix tag colors
 status: draft
 created: 2026-09-02
 related:
-  - PRD-12
+  - PRD-012
 ---
 
-# PRD-11 — Tool prefix tag colors
+# PRD-011 — Tool prefix tag colors
 
 ## Goal
 
@@ -47,7 +47,7 @@ by editing a theme JSON only, no code.
 - Every tool call resolves to a **specific** stylable token, so individual
   tools can be re-tuned iteratively from the theme JSON.
 
-## Starting palette (defined in Monozrakai dark, PRD-12)
+## Starting palette (defined in Monozrakai dark, PRD-012)
 
 | Kind | Tools | Hue |
 |---|---|---|

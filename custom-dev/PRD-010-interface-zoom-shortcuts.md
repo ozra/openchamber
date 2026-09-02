@@ -1,13 +1,13 @@
 ---
-id: PRD-10
+id: PRD-010
 title: Interface zoom shortcuts
 status: draft
 created: 2026-09-02
 related:
-  - PRD-4
+  - PRD-004
 ---
 
-# PRD-10 — Interface zoom shortcuts
+# PRD-010 — Interface zoom shortcuts
 
 ## Goal
 
@@ -24,7 +24,7 @@ per-resolution without OS-level tricks.
 - The global scale already exists: `fontSize` (50–200%,
   `applyTypography`, `useUIStore.ts:2025-2049`) and scales essentially all text
   everywhere — satisfying "any text is affected by zoom". Diffs follow along
-  when the PRD-4 override is unset.
+  when the PRD-004 override is unset.
 
 ## Requirements
 

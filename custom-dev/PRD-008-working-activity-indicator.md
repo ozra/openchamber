@@ -1,11 +1,11 @@
 ---
-id: PRD-8
+id: PRD-008
 title: Working / activity indicator animation
 status: discover
 created: 2026-09-01
 ---
 
-# PRD-8 — Working / activity indicator animation
+# PRD-008 — Working / activity indicator animation
 
 ## Goal
 

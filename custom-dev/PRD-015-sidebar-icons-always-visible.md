@@ -1,13 +1,13 @@
 ---
-id: PRD-15
+id: PRD-015
 title: Sidebar project icons always visible
 status: draft
 created: 2026-09-02
 related:
-  - PRD-12
+  - PRD-012
 ---
 
-# PRD-15 — Sidebar project icons always visible
+# PRD-015 — Sidebar project icons always visible
 
 ## Goal
 
@@ -29,7 +29,7 @@ hover-reveal is code-driven:
   hidden, not missing a color.
 
 So this is its own PRD. If a dedicated "muted at rest" token is wanted, that
-specific bit belongs in the theme (PRD-12), but the visibility behavior is here.
+specific bit belongs in the theme (PRD-012), but the visibility behavior is here.
 
 ## Requirements
 

@@ -1,14 +1,14 @@
 ---
-id: PRD-1
+id: PRD-001
 title: Trajectory timeline scrollbar
 status: draft
 created: 2026-09-01
 related:
-  - PRD-2
-  - PRD-16
+  - PRD-002
+  - PRD-016
 ---
 
-# PRD-1 — Trajectory timeline scrollbar
+# PRD-001 — Trajectory timeline scrollbar
 
 ## Goal
 
@@ -91,7 +91,7 @@ three-lane strip showing the full turn flow.
 - Clicking a span scrolls the chat to that message (reusing the existing
   on-select-turn jump).
 - Later: clicking/selecting a range in the rail reflects in both the trajectory
-  ledger (PRD-2) and the chat.
+  ledger (PRD-002) and the chat.
 
 ## Acceptance criteria
 
@@ -106,8 +106,8 @@ three-lane strip showing the full turn flow.
 
 ## Out of scope / future
 
-- The full trajectory ledger view (PRD-2).
-- Bidirectional navigation sync across rail/ledger/chat (PRD-2, later).
+- The full trajectory ledger view (PRD-002).
+- Bidirectional navigation sync across rail/ledger/chat (PRD-002, later).
 - Live streaming tps (measured client-side from part deltas) — a separate
   feature, also latency-inclusive.
 - Any change to the prompt navigator's existing hover preview or keyboard

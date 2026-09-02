@@ -1,11 +1,11 @@
 ---
-id: PRD-5
+id: PRD-005
 title: Statusbar consolidation
 status: deferred
 created: 2026-09-01
 ---
 
-# PRD-5 — Statusbar consolidation
+# PRD-005 — Statusbar consolidation
 
 ## Goal
 
@@ -18,7 +18,7 @@ visual noise under the composer.
 The composer status bar
 (`packages/ui/src/components/chat/ComposerStatusBar.tsx`) currently shows a lot
 of status/usage info. Some of this can move to the title bar (which already
-shows the used-tokens indicator — see PRD-1 for adding tps there).
+shows the used-tokens indicator — see PRD-001 for adding tps there).
 
 ## Requirements (captured for later)
 
@@ -35,4 +35,4 @@ shows the used-tokens indicator — see PRD-1 for adding tps there).
 ## Out of scope
 
 - Not built now; recorded so the requirement is not lost. Revisit after
-  PRD-1/PRD-2 settle.
+  PRD-001/PRD-002 settle.

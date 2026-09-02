@@ -1,20 +1,20 @@
 ---
-id: PRD-12
+id: PRD-012
 title: Monozrakai theme
 status: draft
 created: 2026-09-02
 related:
-  - PRD-11
+  - PRD-011
 ---
 
-# PRD-12 — Monozrakai theme
+# PRD-012 — Monozrakai theme
 
 ## Goal
 
 Add a "Monozrakai" theme derived from Monokai — one dark and one light variant
 available under that name — with the dark background colors just slightly
 warmer/browner than stock Monokai. The warm-up is iterative: adjusted step by
-step from the user's visual feedback. The theme also carries the PRD-11
+step from the user's visual feedback. The theme also carries the PRD-011
 tool-prefix palette on the dark variant.
 
 ## Background
@@ -36,7 +36,7 @@ Themes are JSON files in `lib/theme/themes/` (`metadata` id/name/variant +
 - **Dark**: clone of `monokai-dark.json`, then nudge the background colors
   slightly warmer/browner. Small, deliberate steps; the user inspects visually
   and we iterate until it feels right.
-- **Dark** also defines `tools.label.<kind>` per PRD-11 (danger /
+- **Dark** also defines `tools.label.<kind>` per PRD-011 (danger /
   benign-change / read-search / web / ai) and `tools.label.thinking`.
 
 ## Iteration process
@@ -48,7 +48,7 @@ The warm-up is a feedback loop:
 2. User inspects on screen.
 3. Adjust again. Repeat.
 
-The PRD-11 token system keeps tool-color tweaks JSON-only, so iteration never
+The PRD-011 token system keeps tool-color tweaks JSON-only, so iteration never
 needs code changes.
 
 ## Acceptance criteria
@@ -56,7 +56,7 @@ needs code changes.
 - Both variants list under "Monozrakai" in the theme picker.
 - Dark backgrounds are slightly warmer/browner than Monokai (subject to
   iteration).
-- Tool prefix colors render on Monozrakai dark (requires PRD-11).
+- Tool prefix colors render on Monozrakai dark (requires PRD-011).
 
 ## Out of scope / future
 

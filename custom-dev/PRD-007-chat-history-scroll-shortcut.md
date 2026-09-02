@@ -1,15 +1,15 @@
 ---
-id: PRD-7
+id: PRD-007
 title: Chat history scroll shortcut
 status: draft
 created: 2026-09-01
 related:
-  - PRD-13
+  - PRD-013
 ---
 
-# PRD-7 — Chat history scroll shortcut
+# PRD-007 — Chat history scroll shortcut
 
-> A constituent of the PRD-13 keyboard epic; implemented under that
+> A constituent of the PRD-013 keyboard epic; implemented under that
 > coordination.
 
 ## Goal
