@@ -5,7 +5,7 @@ status: draft
 created: 2026-09-01
 related:
   - PRD-001
-  - PRD-016
+  - PRD-019
 ---
 
 # PRD-002 — Trajectory ledger view
@@ -23,8 +23,19 @@ The "Raw Messages" context pane
 messages but puts too little information on each line to be a useful trajectory.
 This feature is a separate, purpose-built view.
 
+## Component strategy
+
+Create a fork-owned ledger component beside Raw Messages, following the additive
+variant rule in `custom-dev/README.md`. Keep Raw Messages independently
+available. Share the turn projection and chat-navigation contracts from
+`DOCUMENTATION.md`; do not fork session/message synchronization or reshape Raw
+Messages to serve the ledger.
+
 ## Requirements
 
+- The ledger is a normal stackable workspace view governed by PRD-019. Its
+  position, width bounds, priority, auto-hide, and restoration are not
+  hardcoded locally.
 - One line per entry (user, agent, tool, system, question), giving a compact
   flow overview.
 - Each line carries more useful information than the Raw Messages pane (kind,

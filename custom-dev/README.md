@@ -65,6 +65,38 @@ of becoming a special case.
 Find epics by scanning frontmatter (`grep -l "kind: epic" custom-dev/*.md`) —
 there is no maintained list to go stale.
 
+## Fork customization strategy
+
+Prefer an **additive variant** when a fork feature changes an existing
+component's purpose, interaction model, layout role, or visual identity:
+
+1. Create a fork-owned component beside the upstream component, often starting
+   from a direct copy when that preserves useful behavior most clearly.
+2. Keep the original component available and independently reachable. During
+   development, allow old and new variants to be compared side by side when the
+   layout permits.
+3. Keep authoritative data, transport, state, security checks, and domain logic
+   shared. Copy presentation orchestration; do not fork the source of truth or
+   start duplicate polling/fetch ownership.
+4. Limit edits to existing/core code to generic integration points the variant
+   genuinely needs: registration, shared layout, routing, stable contracts, and
+   narrowly extracted helpers.
+5. When upstream changes the original, compare it with the fork variant and
+   deliberately port useful improvements. Do not make routine upstream merges
+   resolve broad fork-specific edits inside the original component.
+
+Modify the existing component directly when the requirement intentionally
+changes that component for everyone, is a shared bug/invariant fix, or cannot be
+implemented as a variant without duplicating authoritative behavior or changing
+basic layout infrastructure anyway. Small settings, shortcuts, tokens, and
+cross-cutting formatting usually belong on the shared path rather than in copied
+components.
+
+Before implementation, each substantial UI PRD records which path it takes:
+additive variant or direct shared modification, why, what remains shared, and
+the smallest required core integration. This is a decision rule, not a demand
+to copy every component.
+
 ## Cross-cutting note on data reality
 
 Several PRDs depend on timing and token data. The governing constraint
@@ -80,9 +112,11 @@ PRD-013 sets the rule: a function opened from an icon, a shortcut, or the comman
 palette always opens the same picker. Picker-specific improvements are done on
 the picker itself, so the behavior is identical regardless of entry point.
 
-## Cross-cutting note on right-side views
+## Cross-cutting note on stackable workspace views
 
-PRD-016 defines the horizontal-stack model for right-side views: they toggle
-(not switch), double-click isolates, space pressure collapses in a
-deterministic order with chat as the last survivor. PRD-001 (trajectory rail),
-PRD-002 (ledger), and any future right-side view must fit this model.
+PRD-019 owns the horizontal workspace-stack model: reorderable icons determine
+view position; views toggle rather than switch; minimum/normal/maximum widths
+compress before auto-hide; base priority determines which view yields; active
+focus grants temporary acute priority. Auto-hidden views remain enabled and
+restore when room returns. Every stackable view must follow this model rather
+than add local placement or collapse rules.
