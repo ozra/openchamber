@@ -20,6 +20,12 @@ track, and (where feasible) later turn into upstreamable modules.
   algorithms, layout rules. PRDs describe *what*; this describes *how*.
 - `README.md` — this file: the ways of working, not an index.
 
+When listing or mentioning a PRD to the user, include its full filename or title
+alongside the PRD number. For example, use
+`PRD-020-quota-usage-pace-indicator.md` or "PRD-020 - Quota usage pace against
+reset windows", rather than `PRD-020` alone. The number is useful for reference,
+but the filename or title tells the user which PRD it is.
+
 ## PRD format and status
 
 Every PRD starts with YAML frontmatter:
@@ -56,6 +62,10 @@ Normal flow: `draft` → `discover` (when needed) → `ready` → `in-progress` 
 `done`. `closed` and `deferred` are end/park states; superseded work points at
 the PRD that replaced it. On reaching a terminal state, move the file into
 `done/`.
+
+Commit messages for PRD implementation work include the PRD number for every
+PRD implemented in that commit. For example, a commit implementing both
+PRD-011 and PRD-012 includes both numbers.
 
 Planning metadata is required before a PRD becomes `ready`:
 
