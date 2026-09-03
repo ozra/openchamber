@@ -32,7 +32,7 @@ chosen arrangement adapts predictably while protecting the view being used.
 
 | PRD | View |
 |---|---|
-| PRD-001 | Trajectory timeline rail / miniview |
+| PRD-001 | TimelineRail |
 | PRD-002 | Trajectory ledger |
 | PRD-016 | Dashboard information view |
 | PRD-017 | Rich changed-files and diff view |

@@ -4,7 +4,10 @@ title: Tool prefix tag colors
 status: draft
 created: 2026-09-02
 related:
+  - PRD-001
   - PRD-012
+  - PRD-022
+  - PRD-023
 ---
 
 # PRD-011 — Tool prefix tag colors
@@ -38,6 +41,18 @@ by editing a theme JSON only, no code.
   `--tools-label-thinking`, falling back to `--tools-title`.
 - **Mapping**: helper `getToolLabelKind(toolName)` in `lib/toolHelpers.ts`
   maps tool names → kinds (see starting palette).
+- **Shared semantics**: `getToolLabelKind` and the emitted label tokens are the
+  single color source for both message-prefix labels and PRD-001 TimelineRail
+  tool spans. Thinking spans consume `tools.label.thinking`. The rail must not
+  duplicate this map or create a parallel palette.
+- **Question answers**: per PRD-023, the Question tool prefix remains
+  tool-colored, but parsed user answers use the intrinsic user-originated
+  treatment in TimelineRail, Chat, and the ledger. Preserve the question-tool
+  source marker; do not color the user's answer as AI activity merely because
+  it is stored in tool output.
+- **Decoration boundary**: these semantic colors are intrinsic presentation,
+  not a PRD-022 decoration layer. Temporary decoration states preserve or mute
+  the underlying hue according to the consuming view and theme.
 - **Render sites**: prefix labels use
   `var(--tools-label-<kind>, var(--tools-title))` in `ToolPart.tsx`
   (`:2140-2143`, `:2186-2189`, `:889-904`) and `ProgressiveGroup.tsx:688-692`;
@@ -67,6 +82,10 @@ the user develops a feel for what works.
   current look.
 - Description text is unchanged.
 - The palette is adjustable by editing theme JSON only.
+- Tool and Thinking spans in TimelineRail resolve the same semantic token and
+  fallback as their corresponding message-prefix label. Question answers use
+  user-originated styling while retaining tool provenance. Decorations may mute
+  or mark intrinsic styling without becoming its source of truth.
 
 ## Out of scope / future
 

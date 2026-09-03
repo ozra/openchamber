@@ -120,3 +120,18 @@ compress before auto-hide; base priority determines which view yields; active
 focus grants temporary acute priority. Auto-hidden views remain enabled and
 restore when room returns. Every stackable view must follow this model rather
 than add local placement or collapse rules.
+
+## Cross-cutting note on conversation decorations
+
+PRD-022 owns temporary cross-view decoration state. Producers publish scoped,
+source-owned layers to the Conversation Decoration Registry; TimelineRail,
+Chat, the trajectory ledger, and future capable views consume only the channels
+they support. Keep intrinsic message/tool styling outside the registry, and do
+not replace retained layers with one-shot component events.
+
+## Cross-cutting note on Question answers
+
+When projecting completed Question tool output, follow PRD-023. Parsed answers
+are user-originated presentation records with visible question-tool provenance.
+Keep their owning message and part identity; do not create synthetic SDK user
+messages.

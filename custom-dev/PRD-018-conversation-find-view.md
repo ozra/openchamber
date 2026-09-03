@@ -7,6 +7,8 @@ related:
   - PRD-001
   - PRD-013
   - PRD-019
+  - PRD-022
+  - PRD-023
 ---
 
 # PRD-018 - Conversation Find view
@@ -99,16 +101,20 @@ Useful existing anchors:
 
 Search text represented in chat, not arbitrary serialized SDK objects:
 
-- User includes visible user text and visible attached-context text.
+- User includes visible user text, visible attached-context text, and parsed
+  question-tool answers from PRD-023. A question answer keeps a visible
+  question-tool source marker but follows the User filter.
 - Agent includes visible assistant text and reasoning/justification text.
 - Tool includes visible tool name, summary or description, textual input, and
-  textual output.
+  textual output. Do not duplicate a parsed question answer here after it has
+  been classified as user-originated input.
 - Do not expose hidden credentials or fields that chat does not present as
   searchable text.
 
-Project results from rendered chat entries. A user message, assistant text
-entry, or tool call gets one result row when it matches. Repeated occurrences in
-that same entry produce a count badge rather than duplicate rows.
+Project results from rendered chat entries. A user message, question-tool
+answer, assistant text entry, or tool call gets one result row when it matches.
+Repeated occurrences in that same entry produce a count badge rather than
+duplicate rows.
 
 ## Complete-history search
 
@@ -155,25 +161,58 @@ that same entry produce a count badge rather than duplicate rows.
 
 ## Chat and timeline synchronization
 
-- Hovering or keyboard-selecting a result highlights its corresponding turn
-  location in the existing prompt navigator rail. PRD-001 must preserve this
-  preview when it expands the rail into the trajectory timeline.
+- A non-empty valid query publishes one `conversation-find` decoration layer to
+  the PRD-022 Conversation Decoration Registry. Find does not send rendering
+  instructions directly to TimelineRail, Chat, or the trajectory ledger.
+- Use `composition: "exclusive"`. Find results should not be visually mixed
+  with lower-priority additive decoration layers while Find is active.
+- Use `entryStates.unlistedState: "dimmed"`. Every accepted result message or
+  part is `highlighted`, including matches discovered incrementally while older
+  history loads.
+- The keyboard-selected result is `selected`. A hovered result may temporarily
+  use `focused`; when hover ends, restore the producer's selected/highlighted
+  state. Each target has one state in this layer.
+- A tool result targets its matching part span when the result projection has a
+  stable `partId`. Message-level results target the matching message spans.
+- Publish the active literal or regex query through `textMatches`. Every
+  occurrence in text currently visible in a capable conversation view is
+  decorated, even when that message type is excluded by Find's User/Agent/Tool
+  result filters. The selected or hovered result may override those occurrences
+  with `selected` or `focused` in its target.
+- Text decoration never expands a collapsed tool, untruncates ellipsized text,
+  or mounts an off-screen virtualized message. If that content later becomes
+  visible, it reads and applies the retained layer at its current lifecycle
+  phase.
+- A malformed regex preserves the previous valid result layer along with the
+  previous valid result rows. It does not replace them with an empty or dim-only
+  layer.
 - Clicking or pressing Enter scrolls Chat to the matching entry without closing
   Find or resetting its query, filters, ordering, selection, or result scroll.
 - Double clicking or ctrl+enter does as above, but also closes/hides the find
   view, considering it "job done".
-- Highlight the selected search phrase in the target chat entry. For regex,
-  highlight the concrete matched range, not the pattern text.
-- Scope transcript highlighting to the selected result rather than painting all
-  matches across the virtualized chat.
-- If matched tool content is collapsed, reveal enough to show the match without
-  changing unrelated expansion state.
-- Clear rail preview and transcript highlight when the query clears, Find
-  closes, session changes, or the selected result becomes invalid.
-- Loose idea - refine further: perhaps match highlights should continue to be
-  highlighted for a certain time (preferably settings option), and then fade
-  until not highlighted, after find view has been closed (whichever way it was
-  closed)
+- For regex, decorate each concrete visible matched range, not the pattern text.
+- Clearing the query removes the decoration layer immediately. Session,
+  directory, or runtime changes also clear it before a different conversation
+  renders.
+- Search-result, query, filter, ordering, hover, and selection changes replace
+  the same layer atomically and use `changed.transitionMs: 100`. They do not
+  start the withdrawal hold.
+- Closing Find by any explicit close path withdraws its last valid layer. The
+  layer holds at full strength for its configured duration, 5 seconds by
+  default, then transitions every channel to the next applicable decoration or
+  intrinsic style over 2 seconds. This includes toolbar toggle, double click,
+  Ctrl+Enter, and isolation of another view.
+- PRD-019 responsive auto-hide does not close Find or start the hold timer.
+  While Find remains enabled with a valid query, its result layer stays active
+  even if the layout temporarily hides the view.
+- Add a Find setting for `withdrawn.holdMs`. Zero skips the hold and starts the
+  fixed `withdrawn.transitionMs: 2000` transition immediately.
+- Reopening Find during hold or transition republishes the layer, cancels
+  withdrawal, and transitions from its current displayed state to current
+  results.
+- Invalid selection removes only its selected or focused state; it does not
+  discard valid highlighted matches. Reduced-motion mode may remove motion from
+  the transition, but must still clear the layer after the same lifetime.
 
 ## Ctrl+F and other entry points
 
@@ -215,7 +254,20 @@ that same entry produce a count badge rather than duplicate rows.
   recovery.
 - Each matching rendered entry has one typed row with context, highlighted
   first match, and occurrence count.
-- Hover/selection previews the turn in the timeline rail.
+- Question-tool answers participate in the User filter and read as
+  user-originated results while retaining a question-tool source marker.
+- Hover/selection previews the matching message or part span in the timeline
+  rail.
+- While valid results are active, unmatched timeline spans are dimmed, matching
+  spans are highlighted, the keyboard-selected result is selected, and a
+  hovered result may be focused.
+- Every query occurrence in actually visible Chat or ledger text is decorated
+  regardless of Find's result-type filters; hidden content is not expanded or
+  mounted for decoration.
+- Closing Find withdraws one exclusive layer, retaining all channels for the
+  configured duration, 5 seconds by default, then transitioning them over 2
+  seconds. Reopening cancels withdrawal; conversation or query clearing removes
+  stale decoration immediately.
 - Activation scrolls and highlights Chat without closing or resetting Find.
 - Reordering Find's icon positions the view according to PRD-019; no fixed side
   is encoded.
@@ -233,8 +285,13 @@ that same entry produce a count badge rather than duplicate rows.
   Find, and native fallthrough.
 - Stack integration tests for reordering, width pressure, acute priority on
   open/focus, and state preservation through auto-hide/restore.
-- Manual rail preview, transcript highlighting, collapsed-tool reveal, keyboard,
-  focus, and screen-reader checks.
+- Manual rail preview, visible transcript highlighting, collapsed and ellipsized
+  content, keyboard, focus, and screen-reader checks.
+- PRD-022 integration tests for incremental matches, message and part targets,
+  one state per target, result-filter-independent visible text matching,
+  invalid-regex preservation, atomic replacement, every withdrawal path,
+  configurable hold including zero, synchronized channel transition, reopen
+  cancellation, reduced motion, and stale identity clearing.
 - Production profiling with a representative 300k-token fixture and adversarial
   regex patterns, recording input latency, long tasks, result counts, and heap.
 
