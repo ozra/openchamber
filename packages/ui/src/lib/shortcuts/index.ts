@@ -22,6 +22,7 @@ export {
   getEffectiveShortcutCombo,
   getEffectiveShortcutPrefix,
   getShortcutAction,
+  isShortcutActionAvailable,
   SHORTCUT_SCHEMA,
 } from './schema';
 export type {

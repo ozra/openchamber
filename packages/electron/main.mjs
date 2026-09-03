@@ -34,6 +34,7 @@ import {
 import { unsupportedAppSpecificOpenError, validateLocalPath } from './path-open-utils.mjs';
 import { shouldAllowBrowserPanelCertificateError } from './browser-panel-security.mjs';
 import { attachRendererRecovery } from './renderer-recovery.mjs';
+import { createPageZoomController } from './page-zoom.mjs';
 import { mintOutsideFileGrant } from '@openchamber/web/server/lib/fs/routes.js';
 
 const execFileAsync = promisify(execFile);
@@ -42,6 +43,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const isDev = process.env.OPENCHAMBER_ELECTRON_DEV === '1' || !app.isPackaged;
 const electronStartupStartedAt = performance.now();
+const pageZoom = createPageZoomController(() => BrowserWindow.getAllWindows());
 
 const DEEP_LINK_PROTOCOL = 'openchamber';
 const UI_PROTOCOL = 'openchamber-ui';
@@ -2653,10 +2655,7 @@ const createBrowserWindow = ({ label, restoreGeometry, url, runtimeConfig = {} }
     void shell.openExternal(url).catch(() => {});
   });
 
-  browserWindow.webContents.setZoomFactor(1);
-  browserWindow.webContents.on('zoom-changed', () => {
-    browserWindow.webContents.setZoomFactor(1);
-  });
+  pageZoom.applyToWindow(browserWindow);
   attachRendererRecovery(browserWindow, { log, label: 'window' });
 
   browserWindow.webContents.on('dom-ready', () => {
@@ -2677,7 +2676,7 @@ const createBrowserWindow = ({ label, restoreGeometry, url, runtimeConfig = {} }
         documentClass: classifyStartupDocument(browserWindow.webContents.getURL()),
       });
     }
-    browserWindow.webContents.setZoomFactor(1);
+    pageZoom.applyToWindow(browserWindow);
     if (state.mainWindow && browserWindow.id === state.mainWindow.id && pendingDeepLinks.length > 0) {
       const timer = setTimeout(flushPendingDeepLinks, 400);
       if (typeof timer?.unref === 'function') timer.unref();
@@ -3890,6 +3889,15 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
 
     case 'desktop_get_app_version':
       return APP_VERSION;
+
+    case 'desktop_zoom_in':
+      return pageZoom.change('in');
+
+    case 'desktop_zoom_out':
+      return pageZoom.change('out');
+
+    case 'desktop_zoom_reset':
+      return pageZoom.change('reset');
 
     case 'desktop_get_launch_at_login': {
       if (process.platform === 'linux') {
@@ -5119,6 +5127,9 @@ const COMMANDS_SAFE_FOR_REMOTE = new Set([
   'desktop_close_current_window',
   'desktop_get_current_window_state',
   'desktop_get_app_version',
+  'desktop_zoom_in',
+  'desktop_zoom_out',
+  'desktop_zoom_reset',
   'desktop_get_lan_address',
   'desktop_capture_page_rect',
   'desktop_tray_update',

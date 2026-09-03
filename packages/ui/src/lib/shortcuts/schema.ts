@@ -23,6 +23,20 @@ export type ShortcutBindingConflict = {
   kind: ShortcutBindingConflictKind;
 };
 
+type ShortcutRuntimeAvailability = {
+  isElectron: boolean;
+  isVSCode: boolean;
+};
+
+export function isShortcutActionAvailable(
+  action: ShortcutAction,
+  runtime: ShortcutRuntimeAvailability,
+): boolean {
+  if ('electronOnly' in action && action.electronOnly) return runtime.isElectron;
+  if (action.id === 'toggle_prompt_navigator') return !runtime.isVSCode;
+  return true;
+}
+
 export function getShortcutAction(id: string): ShortcutAction | undefined {
   return SHORTCUT_SCHEMA.find((action) => action.id === id);
 }
@@ -75,12 +89,14 @@ export function getShortcutBindingConflicts(
   actionId: ShortcutActionId,
   combo: ShortcutCombo,
   overrides?: Record<string, ShortcutCombo>,
+  runtime?: ShortcutRuntimeAvailability,
 ): ShortcutBindingConflict[] {
   const conflicts: ShortcutBindingConflict[] = [];
   const action = getShortcutAction(actionId);
   if (!action) return conflicts;
   for (const candidate of SHORTCUT_SCHEMA) {
     if (candidate.id === actionId) continue;
+    if (runtime && !isShortcutActionAvailable(candidate, runtime)) continue;
     const candidateCombo = ('prefixStyle' in candidate && candidate.prefixStyle)
       ? getEffectiveShortcutPrefix(candidate.id, overrides)
       : getEffectiveShortcutCombo(candidate.id, overrides);

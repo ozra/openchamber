@@ -1,7 +1,7 @@
 ---
 id: PRD-010
 title: Interface zoom shortcuts
-status: ready
+status: done
 created: 2026-09-02
 depends_on: []
 complexity: medium

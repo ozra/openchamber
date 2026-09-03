@@ -8,7 +8,7 @@ Do not add a component-level `window` or `document` keydown listener for an appl
 
 `config.ts` is the declaration-only source for application commands. It organizes entries into `session`, `models`, `panels`, `navigation`, and `application` groups, then explicitly concatenates them into `SHORTCUT_SCHEMA`. Every entry declares an ID, default binding, and whether users can customize it. Customizable entries also declare their Settings translation key, so Settings must not maintain an action-ID switch or English fallback labels.
 
-Configuration must not contain lookup functions, override resolution, event matching, registry state, or runtime handlers. Those concerns belong to the owning modules below. Keeping configuration declarative makes the complete shortcut inventory reviewable without reading execution code.
+Configuration must not contain lookup functions, override resolution, event matching, registry state, or runtime handlers. Those concerns belong to the owning modules below. Keeping configuration declarative makes the complete shortcut inventory reviewable without reading execution code. Commands that only Electron can execute declare `electronOnly`; Settings, Help, and conflict checks use the shared availability helper so browser-native chords remain untouched.
 
 Component interaction keys that are not application commands, such as list navigation or text editing, do not belong in the schema. Contextual application commands do belong there even when they are not customizable; `save_file` and `find_in_file` are examples.
 

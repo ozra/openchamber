@@ -1,7 +1,7 @@
 ---
 id: PRD-007
 title: Chat history scroll shortcut
-status: ready
+status: done
 created: 2026-09-01
 depends_on: []
 complexity: small

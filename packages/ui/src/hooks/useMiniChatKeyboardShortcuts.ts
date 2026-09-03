@@ -1,6 +1,6 @@
 import React from 'react';
 import { focusChatInput } from '@/components/chat/composer/editor/dom';
-import { canUseElectronDesktopIPC, invokeDesktop } from '@/lib/desktop';
+import { canUseElectronDesktopIPC, invokeDesktop, requestDesktopPageZoom } from '@/lib/desktop';
 import { ShortcutDispatcher, getEffectiveShortcutCombo, shortcutRegistry } from '@/lib/shortcuts';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { useUIStore } from '@/stores/useUIStore';
@@ -90,6 +90,9 @@ export const useMiniChatKeyboardShortcuts = () => {
     },
     cycle_favorite_model_forward: () => cycleFavoriteModel(1),
     cycle_favorite_model_backward: () => cycleFavoriteModel(-1),
+    zoom_in: () => requestDesktopPageZoom('in'),
+    zoom_out: () => requestDesktopPageZoom('out'),
+    zoom_reset: () => requestDesktopPageZoom('reset'),
   });
 
   React.useEffect(() => {

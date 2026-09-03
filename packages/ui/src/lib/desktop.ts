@@ -322,6 +322,16 @@ export const invokeDesktop = async <T = unknown>(command: string, args?: Record<
   return bridge.invoke(command, args ?? {}) as Promise<T>;
 };
 
+type DesktopPageZoomAction = 'in' | 'out' | 'reset';
+
+export const requestDesktopPageZoom = (action: DesktopPageZoomAction): boolean => {
+  if (!canUseElectronDesktopIPC()) return false;
+  void invokeDesktop(`desktop_zoom_${action}`).catch((error) => {
+    console.warn('[desktop] failed to change page zoom', error);
+  });
+  return true;
+};
+
 type LaunchAtLoginStatus = {
   supported: boolean;
   enabled: boolean;

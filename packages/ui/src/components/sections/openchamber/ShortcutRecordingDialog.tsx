@@ -21,6 +21,7 @@ import {
   type CustomizableShortcutAction,
 } from '@/lib/shortcuts';
 import { useI18n } from '@/lib/i18n';
+import { isElectronShell, isVSCodeRuntime } from '@/lib/desktop';
 
 const MODIFIER_KEYS = new Set(['shift', 'control', 'alt', 'meta']);
 const MAX_SHORTCUT_KEY_COUNT = 3;
@@ -91,7 +92,7 @@ function keyboardEventToCombo(event: RecordingKeyboardEvent): ShortcutCombo | nu
 
   const parts: string[] = [];
   if (event.metaKey || event.ctrlKey) parts.push('mod');
-  if (event.shiftKey) parts.push('shift');
+  if (event.shiftKey && key !== 'plus') parts.push('shift');
   if (event.altKey) parts.push('alt');
   parts.push(key);
   return normalizeCombo(parts.join('+'));
@@ -180,7 +181,10 @@ export const ShortcutRecordingDialog: React.FC<ShortcutRecordingDialogProps> = (
 
   const combo = normalizeCombo(recording.chords.join(' '));
   const conflicts = React.useMemo(
-    () => action && combo ? getShortcutBindingConflicts(action.id, combo, overrides) : [],
+    () => action && combo ? getShortcutBindingConflicts(action.id, combo, overrides, {
+      isElectron: isElectronShell(),
+      isVSCode: isVSCodeRuntime(),
+    }) : [],
     [action, combo, overrides],
   );
   const protectedConflict = conflicts.find((conflict) => (

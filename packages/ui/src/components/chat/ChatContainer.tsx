@@ -36,6 +36,7 @@ import { useAuthSessionStore } from '@/lib/runtime-auth-expiry';
 import { useScrollShadow } from '@/components/ui/useScrollShadow';
 import { useChatTimelineScroll, type TimelineListHandle } from '@/hooks/useChatTimelineScroll';
 import { useChatTimelineController } from './hooks/useChatTimelineController';
+import { useKeybind } from '@/hooks/useKeybind';
 import { TimelineDialog } from './TimelineDialog';
 import { useChatTurnNavigation } from './hooks/useChatTurnNavigation';
 import { useChatSurfaceMode } from './useChatSurfaceMode';
@@ -1159,6 +1160,12 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         isPinned,
         showScrollButton,
     });
+    useKeybind('scroll_chat_history_up', () => (
+        hasBlockingChatOverlay() ? false : timelineController.scrollByViewportPage('up')
+    ));
+    useKeybind('scroll_chat_history_down', () => (
+        hasBlockingChatOverlay() ? false : timelineController.scrollByViewportPage('down')
+    ));
     // The list owns the scroll element, so the shadows and the load-older
     // trigger bind to its node rather than to a wrapper we render.
     const scrollNodeRef = React.useMemo(() => ({ current: scrollNode }), [scrollNode]);

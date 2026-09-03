@@ -5,6 +5,8 @@ type ShortcutCategory = 'session' | 'models' | 'panels' | 'navigation' | 'applic
 type ShortcutConfig = {
   id: string;
   defaultBinding: ShortcutCombo;
+  /** Only Electron can execute and configure this command. */
+  electronOnly?: true;
   /** The binding is a bare-modifier chord prefix (completed by another key);
       conflict resolution compares its prefix rather than a full combo. */
   prefixStyle?: true;
@@ -37,6 +39,20 @@ const SHORTCUT_GROUPS = {
       defaultBinding: 'mod+i',
       customizable: true,
       settingsLabelKey: 'settings.openchamber.keyboardShortcuts.action.focus_input.label',
+    },
+    {
+      id: 'scroll_chat_history_up',
+      defaultBinding: 'mod+pageup',
+      customizable: true,
+      settingsLabelKey:
+        'settings.openchamber.keyboardShortcuts.action.scroll_chat_history_up.label',
+    },
+    {
+      id: 'scroll_chat_history_down',
+      defaultBinding: 'mod+pagedown',
+      customizable: true,
+      settingsLabelKey:
+        'settings.openchamber.keyboardShortcuts.action.scroll_chat_history_down.label',
     },
     {
       id: 'open_timeline_dialog',
@@ -251,6 +267,27 @@ const SHORTCUT_GROUPS = {
       defaultBinding: 'mod+k c',
       customizable: true,
       settingsLabelKey: 'settings.openchamber.keyboardShortcuts.action.cycle_theme.label',
+    },
+    {
+      id: 'zoom_in',
+      defaultBinding: 'mod+plus',
+      electronOnly: true,
+      customizable: true,
+      settingsLabelKey: 'settings.openchamber.keyboardShortcuts.action.zoom_in.label',
+    },
+    {
+      id: 'zoom_out',
+      defaultBinding: 'mod+minus',
+      electronOnly: true,
+      customizable: true,
+      settingsLabelKey: 'settings.openchamber.keyboardShortcuts.action.zoom_out.label',
+    },
+    {
+      id: 'zoom_reset',
+      defaultBinding: 'mod+0',
+      electronOnly: true,
+      customizable: true,
+      settingsLabelKey: 'settings.openchamber.keyboardShortcuts.action.zoom_reset.label',
     },
   ],
 } as const satisfies Record<ShortcutCategory, readonly ShortcutConfig[]>;

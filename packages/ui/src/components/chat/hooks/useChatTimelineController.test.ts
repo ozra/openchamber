@@ -5,6 +5,7 @@ import type { Message } from '@opencode-ai/sdk/v2/client';
 
 import {
     isOlderHistoryPrependCommit,
+    resolveViewportPageScrollTop,
     shouldAutoLoadEarlierForUnderfilledPinnedViewport,
     useChatTimelineController,
     type UseChatTimelineControllerResult,
@@ -75,6 +76,38 @@ describe('isOlderHistoryPrependCommit', () => {
     });
 });
 
+describe('resolveViewportPageScrollTop', () => {
+    test('moves by 85 percent of the visible viewport', () => {
+        expect(resolveViewportPageScrollTop({
+            scrollTop: 1_000,
+            scrollHeight: 4_000,
+            clientHeight: 800,
+            direction: 'up',
+        })).toBe(320);
+        expect(resolveViewportPageScrollTop({
+            scrollTop: 1_000,
+            scrollHeight: 4_000,
+            clientHeight: 800,
+            direction: 'down',
+        })).toBe(1_680);
+    });
+
+    test('clamps at both materialized history edges', () => {
+        expect(resolveViewportPageScrollTop({
+            scrollTop: 100,
+            scrollHeight: 1_500,
+            clientHeight: 800,
+            direction: 'up',
+        })).toBe(0);
+        expect(resolveViewportPageScrollTop({
+            scrollTop: 600,
+            scrollHeight: 1_500,
+            clientHeight: 800,
+            direction: 'down',
+        })).toBe(700);
+    });
+});
+
 const deferred = () => {
     let resolve!: () => void;
     const promise = new Promise<void>((next) => {
@@ -129,6 +162,52 @@ const installMinimalDom = () => {
 };
 
 describe('useChatTimelineController identity lifecycle', () => {
+    test('pages the viewport while releasing follow only for upward navigation', async () => {
+        const dom = installMinimalDom();
+        const root: Root = createRoot(dom.container);
+        const scrollMetrics = {
+            scrollTop: 1_000,
+            scrollHeight: 4_000,
+            clientHeight: 800,
+            firstElementChild: null,
+        };
+        const scrollRef = { current: scrollMetrics as unknown as HTMLDivElement };
+        const messageListRef = { current: null };
+        let controller!: UseChatTimelineControllerResult;
+        let releases = 0;
+
+        const Harness = () => {
+            controller = useChatTimelineController({
+                sessionId: 'ses_1',
+                sessionKey: 'runtime\ndirectory\nses_1',
+                messages: [],
+                historyMeta: { limit: 1, complete: true, loading: false },
+                scrollRef,
+                messageListRef,
+                loadMoreMessages: async () => undefined,
+                goToBottom: () => undefined,
+                releaseAutoFollow: () => { releases += 1; },
+                isPinned: false,
+                showScrollButton: false,
+            });
+            return null;
+        };
+
+        try {
+            await act(async () => root.render(React.createElement(Harness)));
+            expect(controller.scrollByViewportPage('up')).toBe(true);
+            expect(scrollMetrics.scrollTop).toBe(320);
+            expect(releases).toBe(1);
+
+            expect(controller.scrollByViewportPage('down')).toBe(true);
+            expect(scrollMetrics.scrollTop).toBe(1_000);
+            expect(releases).toBe(1);
+        } finally {
+            await act(async () => root.unmount());
+            dom.restore();
+        }
+    });
+
     test('preserves the new identity while an old load is waiting for its render', async () => {
         const dom = installMinimalDom();
         const root: Root = createRoot(dom.container);

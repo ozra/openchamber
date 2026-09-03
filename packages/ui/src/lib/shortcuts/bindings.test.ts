@@ -126,6 +126,8 @@ describe('platform shortcut labels', () => {
       'Ctrl + Shift + Alt + N',
     );
     expect(formatShortcutForDisplay('alt', 'Unassigned', 'other')).toBe('Alt');
+    expect(formatShortcutForDisplay('mod+plus', 'Unassigned', 'other')).toBe('Ctrl + +');
+    expect(formatShortcutForDisplay('mod+minus', 'Unassigned', 'other')).toBe('Ctrl + -');
   });
 });
 
@@ -154,5 +156,11 @@ describe('layout-independent key matching', () => {
     expect(resolveShortcutEventDigit({ key: '¡', code: 'Digit1' })).toBe('1');
     expect(resolveShortcutEventDigit({ key: '5', code: 'Digit5' })).toBe('5');
     expect(resolveShortcutEventDigit({ key: 'a', code: 'KeyA' })).toBe(null);
+  });
+
+  test('treats Shift as implicit when it produces the plus key', () => {
+    expect(eventMatchesShortcut(event({ ctrlKey: true, shiftKey: true, key: '+', code: 'Equal' }), 'mod+plus')).toBe(true);
+    expect(eventMatchesShortcut(event({ ctrlKey: true, shiftKey: true, key: '=', code: 'Equal' }), 'mod+plus')).toBe(false);
+    expect(eventMatchesShortcut(event({ ctrlKey: true, shiftKey: true, key: 'p', code: 'KeyP' }), 'mod+p')).toBe(false);
   });
 });

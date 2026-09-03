@@ -4,6 +4,7 @@ import {
   getEffectiveShortcutCombo,
   getShortcutBindingConflicts,
   getShortcutAction,
+  isShortcutActionAvailable,
   parseShortcut,
   SHORTCUT_SCHEMA,
   type ShortcutCategory,
@@ -68,6 +69,23 @@ describe('shortcut schema', () => {
 
   test('uses the conventional close-tab shortcut', () => {
     expect(getShortcutAction('close_session_tab')?.defaultBinding).toBe('mod+w');
+  });
+
+  test('declares chat paging and desktop zoom defaults', () => {
+    expect(getShortcutAction('scroll_chat_history_up')?.defaultBinding).toBe('mod+pageup');
+    expect(getShortcutAction('scroll_chat_history_down')?.defaultBinding).toBe('mod+pagedown');
+    expect(getShortcutAction('zoom_in')?.defaultBinding).toBe('mod+plus');
+    expect(getShortcutAction('zoom_out')?.defaultBinding).toBe('mod+minus');
+    expect(getShortcutAction('zoom_reset')?.defaultBinding).toBe('mod+0');
+  });
+
+  test('limits Electron-only shortcuts to the desktop shell', () => {
+    const zoomIn = getShortcutAction('zoom_in');
+    expect(zoomIn).toBeDefined();
+    if (!zoomIn) return;
+    expect(isShortcutActionAvailable(zoomIn, { isElectron: true, isVSCode: false })).toBe(true);
+    expect(isShortcutActionAvailable(zoomIn, { isElectron: false, isVSCode: false })).toBe(false);
+    expect(isShortcutActionAvailable(zoomIn, { isElectron: false, isVSCode: true })).toBe(false);
   });
 
   test('every action ships with a default binding', () => {

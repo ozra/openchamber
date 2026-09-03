@@ -62,4 +62,9 @@ describe('ShortcutRecordingDialog recording state', () => {
     expect(updateShortcutRecordingState(state, keyEvent('Backspace'), 'keydown').settled).toBe(false);
     expect(updateShortcutRecordingState({ chords: ['mod+k'], livePreview: null, settled: false }, keyEvent('Backspace'), 'keydown')).toEqual(emptyState);
   });
+
+  test('records the Shift needed to type plus as an implicit modifier', () => {
+    const event = { ...keyEvent('+', { ctrlKey: true, shiftKey: true }), code: 'Equal' };
+    expect(updateShortcutRecordingState(emptyState, event, 'keydown').chords).toEqual(['mod+plus']);
+  });
 });

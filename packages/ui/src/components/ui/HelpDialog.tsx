@@ -13,10 +13,11 @@ import {
   getEffectiveShortcutPrefix,
   getShortcutAction,
   formatShortcutForDisplay,
+  isShortcutActionAvailable,
   type ShortcutActionId,
 } from "@/lib/shortcuts";
 import { useI18n, type I18nKey } from "@/lib/i18n";
-import { isVSCodeRuntime } from "@/lib/desktop";
+import { isElectronShell, isVSCodeRuntime } from "@/lib/desktop";
 import type { IconName } from "@/components/icon/icons";
 
 type ShortcutItem = {
@@ -45,6 +46,7 @@ export const HelpDialog: React.FC = () => {
   const setHelpDialogOpen = useUIStore((state) => state.setHelpDialogOpen);
   const shortcutOverrides = useUIStore((state) => state.shortcutOverrides);
   const isVSCode = isVSCodeRuntime();
+  const shortcutRuntime = { isElectron: isElectronShell(), isVSCode };
 
   const shortcuts: ShortcutSection[] = [
     {
@@ -140,6 +142,8 @@ export const HelpDialog: React.FC = () => {
           keys: '',
         },
         { id: 'focus_input', descriptionKey: "helpDialog.item.focusChatInput", icon: "text", keys: '' },
+        { id: 'scroll_chat_history_up', icon: 'arrow-up', keys: '' },
+        { id: 'scroll_chat_history_down', icon: 'arrow-down', keys: '' },
         {
           id: 'toggle_prompt_navigator',
           descriptionKey: "helpDialog.item.togglePromptNavigator",
@@ -202,6 +206,9 @@ export const HelpDialog: React.FC = () => {
           icon: "settings-3",
           keys: '',
         },
+        { id: 'zoom_in', icon: null, keys: '' },
+        { id: 'zoom_out', icon: null, keys: '' },
+        { id: 'zoom_reset', icon: null, keys: '' },
       ],
     },
   ];
@@ -228,7 +235,10 @@ export const HelpDialog: React.FC = () => {
                 </h3>
                 <div className="space-y-1">
                   {section.items
-                    .filter((shortcut) => !(isVSCode && shortcut.id === 'toggle_prompt_navigator'))
+                    .filter((shortcut) => {
+                      const action = shortcut.id ? getShortcutAction(shortcut.id) : undefined;
+                      return !action || isShortcutActionAvailable(action, shortcutRuntime);
+                    })
                     .map((shortcut) => {
                       const action = shortcut.id ? getShortcutAction(shortcut.id) : undefined;
                       const descriptionKey = shortcut.descriptionKey

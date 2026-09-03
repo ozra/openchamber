@@ -11,7 +11,7 @@ import { useCurrentSessionActivity } from '@/hooks/useSessionActivity';
 import { useKeybinds } from '@/hooks/useKeybind';
 import { createWorktreeSession } from '@/lib/worktreeSessionCreator';
 import { useConfigStore } from '@/stores/useConfigStore';
-import { canUseElectronDesktopIPC, invokeDesktop, isVSCodeRuntime } from '@/lib/desktop';
+import { canUseElectronDesktopIPC, invokeDesktop, isVSCodeRuntime, requestDesktopPageZoom } from '@/lib/desktop';
 import {
   eventMatchesShortcut,
   eventMatchesShortcutPrefix,
@@ -306,6 +306,9 @@ export const useKeyboardShortcuts = () => {
       }
       window.dispatchEvent(new CustomEvent('openchamber:dictation-toggle'));
     },
+    zoom_in: () => requestDesktopPageZoom('in'),
+    zoom_out: () => requestDesktopPageZoom('out'),
+    zoom_reset: () => requestDesktopPageZoom('reset'),
     abort_run: () => {
       if (sessionPhase === 'idle' || !currentSessionId) return false;
       void sessionActions.abortCurrentOperation(currentSessionId);

@@ -63,6 +63,8 @@ const KEY_LABEL_MAP: Record<string, string> = {
   end: 'End',
   pageup: 'Page Up',
   pagedown: 'Page Down',
+  plus: '+',
+  minus: '-',
 };
 
 const MODIFIER_PRIORITY: ShortcutModifier[] = ['mod', 'ctrl', 'shift', 'alt'];
@@ -315,7 +317,9 @@ export function eventMatchesShortcut(
 
   if (expectedMod && !modMatches) return false;
   if (!expectedMod && event.metaKey) return false;
-  if (expectedShift !== event.shiftKey) return false;
+  const actualKey = keyToShortcutToken(resolveShortcutEventKey(event));
+  const implicitPlusShift = !expectedShift && event.shiftKey && actualKey === 'plus';
+  if (expectedShift !== event.shiftKey && !implicitPlusShift) return false;
   if (expectedAlt !== event.altKey) return false;
   if (expectedCtrl) {
     if (!event.ctrlKey) return false;
@@ -324,7 +328,7 @@ export function eventMatchesShortcut(
     if (event.ctrlKey && !ctrlUsedAsMod) return false;
   }
 
-  return keyToShortcutToken(resolveShortcutEventKey(event)) === keyToShortcutToken(chord.key);
+  return actualKey === keyToShortcutToken(chord.key);
 }
 
 export function isShortcutPrefixHeld(prefixCombo: ShortcutCombo, heldKeys: ReadonlySet<string>): boolean {

@@ -54,6 +54,7 @@ export interface UseChatTimelineControllerResult {
     resumeToBottomInstant: () => Promise<void>;
     scrollToTurn: (turnId: string, options?: { behavior?: ScrollBehavior }) => Promise<boolean>;
     scrollToMessage: (messageId: string, options?: { behavior?: ScrollBehavior }) => Promise<boolean>;
+    scrollByViewportPage: (direction: 'up' | 'down') => boolean;
     handleHistoryScroll: () => void;
     captureViewportAnchor: () => ViewportAnchor | null;
     restoreViewportAnchor: (anchor: ViewportAnchor) => boolean;
@@ -78,6 +79,7 @@ const MOBILE_TURN_MODEL_CACHE_MAX = 4
 const MOBILE_TURN_MODEL_CACHE_MAX_MESSAGES = 30
 const HISTORY_RENDER_WAIT_TIMEOUT_MS = 250
 const HISTORY_INTERACTION_GUARD_MS = 2000
+const VIEWPORT_PAGE_SCROLL_FACTOR = 0.85
 // Long smooth scrolls across a big session can take a couple of seconds;
 // the pin releases early as soon as the spy reports the target turn.
 const SCROLL_PIN_TIMEOUT_MS = 2500
@@ -136,6 +138,18 @@ export const isOlderHistoryPrependCommit = (input: {
     && input.currentNewestId
     && input.currentNewestId === input.previousNewestId,
 );
+
+export const resolveViewportPageScrollTop = (input: {
+    scrollTop: number;
+    scrollHeight: number;
+    clientHeight: number;
+    direction: 'up' | 'down';
+}): number => {
+    const delta = input.clientHeight * VIEWPORT_PAGE_SCROLL_FACTOR;
+    const maximum = Math.max(0, input.scrollHeight - input.clientHeight);
+    const target = input.scrollTop + (input.direction === 'up' ? -delta : delta);
+    return Math.min(maximum, Math.max(0, target));
+};
 
 // iOS WKWebView ignores programmatic scrollTop writes while a touch drag or
 // momentum (fling) scroll is active: the native scroll animation keeps running
@@ -764,6 +778,28 @@ export const useChatTimelineController = ({
         void loadEarlier({ userInitiated: true });
     }, [loadEarlier, scrollRef]);
 
+    const scrollByViewportPage = React.useCallback((direction: 'up' | 'down'): boolean => {
+        if (!sessionIdRef.current || !timelineIdentityRef.current.key) return false;
+        const container = scrollRef.current;
+        if (!container || container.clientHeight <= 0) return false;
+
+        if (direction === 'up') {
+            releaseAutoFollow();
+        }
+        const target = resolveViewportPageScrollTop({
+            scrollTop: container.scrollTop,
+            scrollHeight: container.scrollHeight,
+            clientHeight: container.clientHeight,
+            direction,
+        });
+        container.scrollTop = target;
+
+        if (direction === 'up' && target === 0 && historySignalsRef.current.canLoadEarlier) {
+            void loadEarlier({ userInitiated: true });
+        }
+        return true;
+    }, [loadEarlier, releaseAutoFollow, scrollRef]);
+
     const loadEarlierIfPinnedViewportUnderfilled = React.useCallback(() => {
         // On mobile the initial page is intentionally smaller. Auto-prepending
         // older rows after first paint shifts the narrow timeline; let explicit
@@ -977,6 +1013,7 @@ export const useChatTimelineController = ({
         resumeToBottomInstant,
         scrollToTurn,
         scrollToMessage,
+        scrollByViewportPage,
         handleHistoryScroll,
         captureViewportAnchor,
         restoreViewportAnchor,
