@@ -30,11 +30,9 @@ import {
 //
 //   • `following-end`      — pinned to the live edge. The list keeps us there
 //     through `maintainScrollAtEnd`; we only re-assert after a data change.
-//   • `anchoring-new-turn` — the just-sent user message is parked near the TOP
-//     of the viewport and the reply streams into the reserved end space below
-//     it. The viewport does NOT move while the turn still fits; once the turn
-//     outgrows the usable viewport we scroll by the exact delta needed to keep
-//     its end visible.
+//   • `anchoring-new-turn` — legacy support for parking a just-sent user
+//     message near the top of the viewport. Normal prompt submission no longer
+//     enters this mode; it stays on the live edge instead.
 //   • `free-scrolling`     — the user took over. Nothing moves until they opt
 //     back in by returning to the end.
 //
@@ -74,8 +72,8 @@ interface UseChatTimelineScrollOptions {
     currentSessionKey: string | null;
     sessionMessageCount: number;
     composerOverlayHeight: number;
-    // Id of the newest user message in the rendered timeline. When a send has
-    // armed the anchor, the next new id here becomes the anchored row.
+    // Id of the newest user message in the rendered timeline. Legacy anchoring
+    // claims the next new id after it is armed.
     lastUserMessageId: string | null;
     // True while the session is producing output. Follow corrections glide
     // only then. Outside a live stream — entering a session, a tab becoming
@@ -162,7 +160,7 @@ export const useChatTimelineScroll = ({
     // while `liveFollowGenerationRef` still equals it.
     const userGenerationRef = React.useRef(0);
     const liveFollowGenerationRef = React.useRef<number | null>(0);
-    // Anchor lifecycle: armed on send → pending until the row exists → positioned
+    // Legacy anchor lifecycle: armed → pending until the row exists → positioned
     // while the animated scroll runs → settled once it has come to rest.
     const armedForNextUserMessageRef = React.useRef(false);
     const pendingAnchorRef = React.useRef<string | null>(null);
@@ -341,49 +339,28 @@ export const useChatTimelineScroll = ({
     }, [clearAnchor, clearGoToBottomReasserts, hideScrollButton]);
 
     // User preference: with auto-follow off, streaming growth never moves the
-    // viewport. Sending from the live edge still parks the new message at the
-    // top, but no glide or end-follow correction runs afterwards; sending from
-    // mid-history leaves the viewport untouched.
+    // viewport. A reader who sends from mid-history stays there; sending from
+    // the live edge follows the normal end-appending flow.
     const streamingAutoFollowEnabled = useUIStore((state) => state.streamingAutoFollowEnabled);
     const streamingAutoFollowEnabledRef = React.useRef(streamingAutoFollowEnabled);
     streamingAutoFollowEnabledRef.current = streamingAutoFollowEnabled;
 
-    // Sending arms the anchor. The message id is not known here (the optimistic
-    // row is created by the store), so the next new user message id claims it.
-    // Whether the send-time anchor positioning may animate. Sending from the
-    // live edge parks the new message with a short smooth scroll; sending
-    // from mid-history teleports — a long smooth scroll through the
-    // virtualized timeline gets cancelled by rows mounting and measuring
-    // along the way and dies partway there.
+    // Legacy anchor support. Once armed, it claims the next new user message id
+    // because the store creates the optimistic row.
+    // Long smooth scrolls through the virtualized timeline can stop as rows
+    // mount and measure, so the retained flag also supports instant positioning.
     const anchorPositionInstantRef = React.useRef(false);
 
     const scrollToBottomOnSend = React.useCallback(() => {
-        // With auto-follow off, a reader who scrolled away from the end stays
-        // exactly where they are: the sent message is not anchored and the
-        // scroll-to-bottom pill (already showing) leads to it. From the live
-        // edge, sending anchors the new turn as usual.
+        // With auto-follow off, sending from mid-history preserves the reader's
+        // position. Every other send jumps to the live edge immediately.
         if (!streamingAutoFollowEnabledRef.current && !isAtEndRef.current) return;
-        anchorPositionInstantRef.current = !isAtEndRef.current;
-        isAtEndRef.current = true;
-        setUserOwnsScroll(false);
-        modeRef.current = 'anchoring-new-turn';
-        liveFollowGenerationRef.current = userGenerationRef.current;
-        armedForNextUserMessageRef.current = true;
-        // The optimistic row is not committed yet; the next NEW user message id
-        // relative to this baseline claims the anchor, independent of whether
-        // the commit lands before or after this call.
-        armBaselineUserMessageIdRef.current = lastArmedUserMessageIdRef.current;
-        pendingAnchorRef.current = null;
-        positionedAnchorRef.current = null;
-        settledAnchorRef.current = null;
-        activeAnchorIndexRef.current = null;
-        hideScrollButton();
-    }, [hideScrollButton]);
+        goToBottom('instant');
+    }, [goToBottom]);
 
-    // Claim the anchor as soon as the sent row exists in the timeline. The
-    // comparison is against the baseline captured when the send armed the
-    // anchor, so the claim works whether the optimistic row committed before
-    // or after the arming call.
+    // Claim a legacy anchor as soon as the sent row exists in the timeline. The
+    // comparison uses the baseline captured when the anchor was armed, so this
+    // works whether the optimistic row committed before or after that call.
     const lastArmedUserMessageIdRef = React.useRef<string | null>(lastUserMessageId);
     const armBaselineUserMessageIdRef = React.useRef<string | null>(lastUserMessageId);
     React.useEffect(() => {

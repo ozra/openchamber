@@ -66,6 +66,10 @@ describe('shortcut schema', () => {
     expect(getShortcutAction('switch_context_surface')?.defaultBinding).toBe('mod+alt');
   });
 
+  test('uses the conventional close-tab shortcut', () => {
+    expect(getShortcutAction('close_session_tab')?.defaultBinding).toBe('mod+w');
+  });
+
   test('every action ships with a default binding', () => {
     // Palette-only commands live outside this schema entirely; an action in
     // the schema without a binding would be dead weight in Settings.

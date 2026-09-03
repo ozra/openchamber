@@ -4855,7 +4855,7 @@ const buildMacMenu = () => {
         { type: 'separator' },
         { label: 'Add Workspace', click: () => dispatchAction('change-workspace') },
         { type: 'separator' },
-        { role: 'close' },
+        { role: 'close', accelerator: 'Cmd+Shift+W' },
       ],
     },
     {
@@ -4897,7 +4897,7 @@ const buildMacMenu = () => {
         { role: 'minimize' },
         { role: 'zoom' },
         { type: 'separator' },
-        { role: 'close' },
+        { role: 'close', accelerator: 'Cmd+Shift+W' },
       ],
     },
     {
@@ -5012,7 +5012,7 @@ const buildAutoHiddenMenu = () => {
         { role: 'minimize' },
         { role: 'togglefullscreen' },
         { type: 'separator' },
-        { role: 'close' },
+        { role: 'close', accelerator: 'Ctrl+Shift+W' },
       ],
     },
     {

@@ -81,7 +81,7 @@ const SHORTCUT_GROUPS = {
     },
     {
       id: 'close_session_tab',
-      defaultBinding: 'alt+w',
+      defaultBinding: 'mod+w',
       customizable: true,
       settingsLabelKey: 'settings.openchamber.keyboardShortcuts.action.close_session_tab.label',
     },
