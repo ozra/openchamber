@@ -3178,6 +3178,11 @@ export const dict: Record<I18nKey, string> = {
   'onboarding.localSetup.status.autoContinue': '検出され次第自動的に続行します。',
   'updateDialog.changelog.title': '新機能',
   'quota.window.premiumInteractions': 'AIクレジット',
+  'quota.pace.aria.onPace': '{used}％使用済み、経過時間と同ペースです',
+  'quota.pace.aria.aheadOne': '{used}％使用済み、経過時間より1ポイント先行しています',
+  'quota.pace.aria.aheadMany': '{used}％使用済み、経過時間より{delta}ポイント先行しています',
+  'quota.pace.aria.behindOne': '{used}％使用済み、経過時間より1ポイント遅れています',
+  'quota.pace.aria.behindMany': '{used}％使用済み、経過時間より{delta}ポイント遅れています',
 
   'chat.workStatus.ariaLabel': '作業状況',
   'chat.workStatus.context.label': 'コンテキスト',

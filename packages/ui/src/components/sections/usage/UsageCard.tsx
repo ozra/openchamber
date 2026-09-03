@@ -1,9 +1,20 @@
+import React from 'react';
 import type { UsageWindow } from '@/types';
-import { formatQuotaValueLabel, formatQuotaResetLabel, formatWindowLabel } from '@/lib/quota';
+import {
+  computePaceDelta,
+  formatPaceAriaLabel,
+  formatPaceDelta,
+  formatQuotaValueLabel,
+  formatQuotaResetLabel,
+  formatWindowLabel,
+  resolvePaceTone,
+  useQuotaPaceNow,
+} from '@/lib/quota';
 import { UsageProgressBar } from './UsageProgressBar';
 import { useQuotaStore } from '@/stores/useQuotaStore';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useUIStore } from '@/stores/useUIStore';
+import { useI18n } from '@/lib/i18n';
 
 interface UsageCardProps {
   title: string;
@@ -22,11 +33,28 @@ export const UsageCard: React.FC<UsageCardProps> = ({
   toggleEnabled = false,
   onToggle,
 }) => {
+  const { t } = useI18n();
   const displayMode = useQuotaStore((state) => state.displayMode);
   const timeFormatPreference = useUIStore((state) => state.timeFormatPreference);
+  // The settings page renders the card only while it is on screen; the shared
+  // visibility-gated clock updates every eligible row together.
+  const now = useQuotaPaceNow(true);
+  const usedPercent = window.usedPercent;
+  // Pace rides next to the used percentage itself; value-label rows (credits,
+  // spend) keep their tone but never gain a delta whose units would not match.
+  // `computePaceDelta` establishes finitude of every field.
+  const paceDelta = displayMode === 'usage' && !window.valueLabel
+    ? computePaceDelta(window, now)
+    : null;
   const displayPercent = displayMode === 'remaining' ? window.remainingPercent : window.usedPercent;
   const barLabel = displayMode === 'remaining' ? 'remaining' : 'used';
   const percentLabel = formatQuotaValueLabel(window.valueLabel, displayPercent);
+  const percentText = percentLabel === '-' ? '' : paceDelta !== null
+    ? `${percentLabel} (${formatPaceDelta(paceDelta)})`
+    : percentLabel;
+  const paceAria = paceDelta !== null && usedPercent !== null
+    ? formatPaceAriaLabel(t, usedPercent, paceDelta)
+    : undefined;
   const resetLabel = formatQuotaResetLabel(window.resetAt, window.resetAfterFormatted ?? window.resetAtFormatted, timeFormatPreference);
   const windowLabel = formatWindowLabel(title);
 
@@ -48,15 +76,18 @@ export const UsageCard: React.FC<UsageCardProps> = ({
             )}
           </div>
         </div>
-        <div className="typography-ui-label text-foreground tabular-nums flex items-center justify-end">
-          {percentLabel === '-' ? '' : percentLabel}
+        <div
+          aria-label={paceAria}
+          className="typography-ui-label text-foreground tabular-nums flex items-center justify-end"
+        >
+          {percentText}
         </div>
       </div>
 
       <div className="mt-2.5">
         <UsageProgressBar
           percent={displayPercent}
-          tonePercent={window.usedPercent}
+          tone={resolvePaceTone(window, now)}
           className="h-1.5"
         />
         <div className="mt-1 flex items-center justify-between">

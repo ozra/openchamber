@@ -189,8 +189,11 @@ const TONE_COLOR: Record<Exclude<WorkStatusTone, 'default' | 'muted'>, string> =
 export const WorkStatusValue: React.FC<{
   children: React.ReactNode;
   tone?: WorkStatusTone;
-}> = ({ children, tone = 'default' }) => (
+  /** Replaces the audible reading of the value's text, e.g. to spell out a pace delta. */
+  ariaLabel?: string;
+}> = ({ children, tone = 'default', ariaLabel }) => (
   <span
+    aria-label={ariaLabel}
     className={tone === 'muted' ? 'text-muted-foreground' : undefined}
     style={tone === 'default' || tone === 'muted' ? undefined : { color: TONE_COLOR[tone] }}
   >

@@ -33,7 +33,17 @@ import { toast } from '@/components/ui';
 import { ProviderLogo } from '@/components/ui/ProviderLogo';
 import { UsageProgressBar } from '@/components/sections/usage/UsageProgressBar';
 import { Icon } from "@/components/icon/Icon";
-import { formatQuotaValueLabel, formatQuotaResetLabel, formatWindowLabel, QUOTA_PROVIDERS } from '@/lib/quota';
+import {
+  QUOTA_PROVIDERS,
+  computePaceDelta,
+  formatPaceAriaLabel,
+  formatPaceDelta,
+  formatQuotaResetLabel,
+  formatQuotaValueLabel,
+  formatWindowLabel,
+  resolvePaceTone,
+  useQuotaPaceNow,
+} from '@/lib/quota';
 import { useQuotaAutoRefresh, useQuotaStore } from '@/stores/useQuotaStore';
 import { updateDesktopSettings } from '@/lib/persistence';
 import { formatTimeForPreference } from '@/lib/timeFormat';
@@ -686,6 +696,11 @@ const VSCodeHeader: React.FC<VSCodeHeaderProps> = ({ title, showBack, onBack, on
   const dropdownProviderIds = useQuotaStore((state) => state.dropdownProviderIds);
   const loadQuotaSettings = useQuotaStore((state) => state.loadSettings);
   const setQuotaDisplayMode = useQuotaStore((state) => state.setDisplayMode);
+  // The quota dropdown is the only quota surface in the header; the shared
+  // visibility-gated clock ticks only while it is actually open, and a fresh
+  // value arrives on every open (the ticker delivers immediately on subscribe).
+  const [quotaDropdownOpen, setQuotaDropdownOpen] = React.useState(false);
+  const quotaPaceNow = useQuotaPaceNow(quotaDropdownOpen);
 
   useQuotaAutoRefresh();
 
@@ -889,6 +904,7 @@ const VSCodeHeader: React.FC<VSCodeHeaderProps> = ({ title, showBack, onBack, on
       {showRateLimits && (
         <DropdownMenu
           onOpenChange={(open) => {
+            setQuotaDropdownOpen(open);
             if (open && quotaResults.length === 0) {
               fetchAllQuotas();
             }
@@ -980,10 +996,26 @@ const VSCodeHeader: React.FC<VSCodeHeaderProps> = ({ title, showBack, onBack, on
                   </DropdownMenuItem>
                 ) : (
                   group.entries.map(([label, window]) => {
+                    const usedPercent = window.usedPercent;
+                    // The delta only reads correctly next to the used
+                    // percentage itself; value-label rows (credits, spend)
+                    // keep their tone but never gain a mismatched suffix.
+                    // `computePaceDelta` establishes finitude of every field.
+                    const paceDelta = quotaDisplayMode === 'usage' && !window.valueLabel
+                      ? computePaceDelta(window, quotaPaceNow)
+                      : null;
                     const displayPercent = quotaDisplayMode === 'remaining'
                       ? window.remainingPercent
                       : window.usedPercent;
                     const metricLabel = formatQuotaValueLabel(window.valueLabel, displayPercent);
+                    const metricText = metricLabel === '-'
+                      ? ''
+                      : paceDelta !== null
+                        ? `${metricLabel} (${formatPaceDelta(paceDelta)})`
+                        : metricLabel;
+                    const paceAria = paceDelta !== null && usedPercent !== null
+                      ? formatPaceAriaLabel(t, usedPercent, paceDelta)
+                      : undefined;
                     return (
                     <DropdownMenuItem
                       key={`${group.providerId}-${label}`}
@@ -993,13 +1025,16 @@ const VSCodeHeader: React.FC<VSCodeHeaderProps> = ({ title, showBack, onBack, on
                       <span className="flex min-w-0 flex-1 flex-col gap-2">
                               <span className="flex min-w-0 items-center justify-between gap-3">
                                 <span className="truncate typography-micro text-muted-foreground">{formatWindowLabel(label)}</span>
-                                <span className="typography-ui-label text-foreground tabular-nums">
-                                  {metricLabel === '-' ? '' : metricLabel}
+                                <span
+                                  aria-label={paceAria}
+                                  className="typography-ui-label text-foreground tabular-nums"
+                                >
+                                  {metricText}
                                 </span>
                               </span>
                               <UsageProgressBar
                                 percent={displayPercent}
-                                tonePercent={window.usedPercent}
+                                tone={resolvePaceTone(window, quotaPaceNow)}
                                 className="h-1"
                               />
                               <span className="flex items-center justify-between typography-micro text-muted-foreground text-[10px]">

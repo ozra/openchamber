@@ -59,7 +59,19 @@ export const formatQuotaResetLabel = (
   }
 };
 
-export const resolveUsageTone = (percent: number | null): 'safe' | 'warn' | 'critical' => {
+/** Quota color states shared by every quota surface. */
+export type QuotaTone = 'safe' | 'warn' | 'critical';
+
+/**
+ * True for actual finite numbers — `null`, `undefined`, `NaN`, and infinities
+ * all fail. The quota layer's single number-presence guard: usage windows cross
+ * a network boundary, so presence and finitude are checked once here and every
+ * downstream branch narrows on the domain value instead of re-checking types.
+ */
+export const isFiniteNumber = (value: number | null | undefined): value is number =>
+  Number.isFinite(value);
+
+export const resolveUsageTone = (percent: number | null): QuotaTone => {
   if (percent === null) {
     return 'safe';
   }

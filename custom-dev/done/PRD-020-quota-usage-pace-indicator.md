@@ -1,7 +1,7 @@
 ---
 id: PRD-020
 title: Quota usage pace against reset windows
-status: ready
+status: done
 created: 2026-09-02
 depends_on: []
 complexity: medium
@@ -123,7 +123,7 @@ to usage. Switching display modes must not mutate the underlying calculation.
 
 ## Tone
 
-- If `paceDelta > 0`, render the used value in the error/red tone.
+- If `paceDelta > 0`, render the used value in the warning/orange tone.
 - If `paceDelta <= 0`, use the regular tone.
 - For eligible windows, pace tone replaces the fixed 50%/80% warning thresholds.
   A high percentage near reset can be on pace, while a low percentage near the
@@ -169,7 +169,7 @@ not calculate presentation pace or colors independently.
   shows `used% (signed pace delta%)` in Used mode.
 - The elapsed benchmark is derived to the second from `resetAt - windowSeconds`
   through `resetAt`.
-- Usage ahead of elapsed time is red; usage on or behind pace has regular tone.
+- Usage ahead of elapsed time is orange (warning); usage on or behind pace has regular tone.
 - The percentage text, progress bar, compact card, Work Status summary, and VS
   Code dropdown agree.
 - Remaining mode, balances, missing timing, inconsistent timing, and expired
