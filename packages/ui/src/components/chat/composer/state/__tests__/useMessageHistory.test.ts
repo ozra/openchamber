@@ -3,9 +3,11 @@ import { describe, expect, test } from 'bun:test';
 import {
     HISTORY_IDLE,
     INITIAL_HISTORY_STATE,
+    canWalkPromptHistory,
     stepNewer,
     stepOlder,
     type HistoryState,
+    type PromptHistoryNavigationInput,
 } from '../useMessageHistory';
 
 const HISTORY = ['newest', 'middle', 'oldest'];
@@ -109,5 +111,46 @@ describe('a shrinking history', () => {
     test('an index past the end of a shorter history cannot step further back', () => {
         const state: HistoryState = { index: 5, stashedDraft: 'draft' };
         expect(stepOlder(state, HISTORY, 'x').text).toBeNull();
+    });
+});
+
+describe('canWalkPromptHistory — the arrow-key gate', () => {
+    const input = (overrides: Partial<PromptHistoryNavigationInput> = {}): PromptHistoryNavigationInput => ({
+        empty: false,
+        caretAtStart: false,
+        caretAtEnd: false,
+        autocompleteOpen: false,
+        ...overrides,
+    });
+
+    test('off never allows walking history, whatever the caret', () => {
+        expect(canWalkPromptHistory(false, 'older', input({ empty: true }))).toBe(false);
+        expect(canWalkPromptHistory(false, 'older', input({ caretAtStart: true }))).toBe(false);
+        expect(canWalkPromptHistory(false, 'newer', input({ empty: true }))).toBe(false);
+        expect(canWalkPromptHistory(false, 'newer', input({ caretAtEnd: true }))).toBe(false);
+    });
+
+    test('off blocks walking even when the caret conditions and autocomplete would allow it', () => {
+        expect(canWalkPromptHistory(false, 'older', input({ empty: true, caretAtStart: true }))).toBe(false);
+        expect(canWalkPromptHistory(false, 'newer', input({ empty: true, caretAtEnd: true }))).toBe(false);
+    });
+
+    test('on preserves the older caret conditions: empty composer or caret at start', () => {
+        expect(canWalkPromptHistory(true, 'older', input({ empty: true }))).toBe(true);
+        expect(canWalkPromptHistory(true, 'older', input({ caretAtStart: true }))).toBe(true);
+        expect(canWalkPromptHistory(true, 'older', input())).toBe(false);
+        expect(canWalkPromptHistory(true, 'older', input({ caretAtEnd: true }))).toBe(false);
+    });
+
+    test('on preserves the newer caret conditions: empty composer or caret at end', () => {
+        expect(canWalkPromptHistory(true, 'newer', input({ empty: true }))).toBe(true);
+        expect(canWalkPromptHistory(true, 'newer', input({ caretAtEnd: true }))).toBe(true);
+        expect(canWalkPromptHistory(true, 'newer', input())).toBe(false);
+        expect(canWalkPromptHistory(true, 'newer', input({ caretAtStart: true }))).toBe(false);
+    });
+
+    test('an open autocomplete always owns the arrow keys', () => {
+        expect(canWalkPromptHistory(true, 'older', input({ empty: true, autocompleteOpen: true }))).toBe(false);
+        expect(canWalkPromptHistory(true, 'newer', input({ empty: true, autocompleteOpen: true }))).toBe(false);
     });
 });

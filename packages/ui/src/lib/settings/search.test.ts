@@ -64,4 +64,28 @@ describe('settings search', () => {
     expect(results.some((result) => result.id === 'integrations.linear.add-workspace')).toBe(false);
     expect(results.some((result) => result.id === 'integrations.linear.mapping')).toBe(false);
   });
+
+  test('finds the arrow-key prompt history setting by its visible label and keywords', () => {
+    for (const query of ['arrow keys recall previous prompts', 'prompt history', 'arrow key']) {
+      const results = buildSettingsSearchResults({
+        query,
+        runtimeCtx,
+        t,
+        getPageTitle: (page) => page,
+      });
+
+      expect(results.some((result) => result.id === 'chat.arrow-key-prompt-history')).toBe(true);
+    }
+  });
+
+  test('the arrow-key prompt history setting is searchable everywhere the composer runs', () => {
+    const results = buildSettingsSearchResults({
+      query: 'arrow key',
+      runtimeCtx: { ...runtimeCtx, isMobile: true, isDesktop: true },
+      t,
+      getPageTitle: (page) => page,
+    });
+
+    expect(results.some((result) => result.id === 'chat.arrow-key-prompt-history')).toBe(true);
+  });
 });

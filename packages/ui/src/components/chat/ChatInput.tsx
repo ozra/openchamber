@@ -146,7 +146,7 @@ import {
     parseSlashCommand,
 } from './composer/submit/slashCommands';
 import { useAutocompletePosition } from './composer/state/useAutocompletePosition';
-import { useMessageHistory } from './composer/state/useMessageHistory';
+import { canWalkPromptHistory, useMessageHistory } from './composer/state/useMessageHistory';
 import { useComposerDraft } from './composer/state/useComposerDraft';
 import { useDraftTarget } from './composer/state/useDraftTarget';
 import { useMobileComposerShell } from './composer/state/useMobileComposerShell';
@@ -431,6 +431,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const inputBarOffset = useUIStore((state) => state.inputBarOffset);
     const persistChatDraft = useUIStore((state) => state.persistChatDraft);
     const inputSpellcheckEnabled = useUIStore((state) => state.inputSpellcheckEnabled);
+    const arrowKeyPromptHistoryEnabled = useUIStore((state) => state.arrowKeyPromptHistoryEnabled);
     const largeTextPasteBehavior = useUIStore((state) => state.largeTextPasteBehavior);
     const isExpandedInput = useUIStore((state) => state.isExpandedInput);
     const setExpandedInput = useUIStore((state) => state.setExpandedInput);
@@ -1673,11 +1674,20 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         // Handle ArrowUp/ArrowDown for message history navigation
         // ArrowUp: only when cursor at start (position 0) or input is empty
         // ArrowDown: also works when cursor at end (to cycle forward through history)
+        // The whole walk is gated behind "Arrow keys recall previous prompts"
+        // (default off): off means the arrows behave like an ordinary
+        // multiline textbox.
         const isAnyAutocompleteOpen = openAutocomplete !== null;
         const cursorAtStart = composerRef.current?.getSelection().start === 0 && composerRef.current?.getSelection().end === 0;
         const cursorAtEnd = composerRef.current?.getSelection().start === message.length && composerRef.current?.getSelection().end === message.length;
-        const canNavigateHistoryUp = !isAnyAutocompleteOpen && (message.length === 0 || cursorAtStart);
-        const canNavigateHistoryDown = !isAnyAutocompleteOpen && (message.length === 0 || cursorAtEnd);
+        const navigationInput = {
+            empty: message.length === 0,
+            caretAtStart: cursorAtStart,
+            caretAtEnd: cursorAtEnd,
+            autocompleteOpen: isAnyAutocompleteOpen,
+        };
+        const canNavigateHistoryUp = canWalkPromptHistory(arrowKeyPromptHistoryEnabled, 'older', navigationInput);
+        const canNavigateHistoryDown = canWalkPromptHistory(arrowKeyPromptHistoryEnabled, 'newer', navigationInput);
 
         // Markdown-aware auto-pairing (source mode), normal input only.
         if (inputMode === 'normal' && !isAnyAutocompleteOpen && !e.metaKey && !e.ctrlKey && !e.altKey) {

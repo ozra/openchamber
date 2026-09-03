@@ -566,6 +566,7 @@ const materializeAuthoritativeUiSettings = (settings: DesktopSettings): DesktopS
     summaryLength: defaults.summaryLength,
     maxLastMessageLength: defaults.maxLastMessageLength,
     inputSpellcheckEnabled: defaults.inputSpellcheckEnabled,
+    arrowKeyPromptHistoryEnabled: defaults.arrowKeyPromptHistoryEnabled,
     showOpenCodeUpdateNotifications: defaults.showOpenCodeUpdateNotifications,
     agentControlToolEnabled: defaults.agentControlToolEnabled,
     agentWebToolEnabled: defaults.agentWebToolEnabled,
@@ -735,6 +736,9 @@ const applyDesktopUiPreferences = (settings: DesktopSettings) => {
   }
   if (typeof settings.inputSpellcheckEnabled === 'boolean' && settings.inputSpellcheckEnabled !== store.inputSpellcheckEnabled) {
     store.setInputSpellcheckEnabled(settings.inputSpellcheckEnabled);
+  }
+  if (typeof settings.arrowKeyPromptHistoryEnabled === 'boolean' && settings.arrowKeyPromptHistoryEnabled !== store.arrowKeyPromptHistoryEnabled) {
+    store.setArrowKeyPromptHistoryEnabled(settings.arrowKeyPromptHistoryEnabled);
   }
   if (
     typeof settings.showOpenCodeUpdateNotifications === 'boolean'
@@ -1438,6 +1442,9 @@ const sanitizeWebSettings = (payload: unknown): DesktopSettings | null => {
 
   if (typeof candidate.inputSpellcheckEnabled === 'boolean') {
     result.inputSpellcheckEnabled = candidate.inputSpellcheckEnabled;
+  }
+  if (typeof candidate.arrowKeyPromptHistoryEnabled === 'boolean') {
+    result.arrowKeyPromptHistoryEnabled = candidate.arrowKeyPromptHistoryEnabled;
   }
   if (typeof candidate.showOpenCodeUpdateNotifications === 'boolean') {
     result.showOpenCodeUpdateNotifications = candidate.showOpenCodeUpdateNotifications;

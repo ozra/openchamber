@@ -444,6 +444,25 @@ describe('updateDesktopSettings', () => {
     expect(localStorage.getItem('selectedThemeId')).toBe('existing-theme');
   });
 
+  test('arrow-key prompt history defaults off, round-trips, and hydrates from stored settings', async () => {
+    getWindow();
+    expect(useUIStore.getState().arrowKeyPromptHistoryEnabled).toBe(false);
+
+    // A save persists the change and applies it to the running store.
+    registerSettingsSave(async (changes) => changes as SettingsPayload);
+    await updateDesktopSettings({ arrowKeyPromptHistoryEnabled: true });
+    expect(useUIStore.getState().arrowKeyPromptHistoryEnabled).toBe(true);
+
+    // A stored value hydrates the store on sync.
+    useUIStore.setState({ arrowKeyPromptHistoryEnabled: false });
+    registerSettingsApi(async () => ({}), async () => ({
+      settings: { arrowKeyPromptHistoryEnabled: true },
+      source: 'web',
+    }));
+    await syncDesktopSettings();
+    expect(useUIStore.getState().arrowKeyPromptHistoryEnabled).toBe(true);
+  });
+
   test('applies authoritative shared sidebar preferences without replacing local-only sidebar state', async () => {
     getWindow();
     useSessionDisplayStore.setState({

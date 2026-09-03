@@ -208,6 +208,7 @@ const ChatSectionContent: React.FC = () => {
                 'fileViewerPreview',
                 'followUpBehavior',
                 'persistDraft',
+                'arrowKeyHistory',
                 'inputSpellcheck',
                 'largeTextPaste',
             ]}

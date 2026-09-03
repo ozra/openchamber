@@ -361,6 +361,13 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     isAvailable: (ctx) => !ctx.isMobile,
   },
   {
+    id: 'chat.arrow-key-prompt-history',
+    page: 'chat',
+    titleKey: 'settings.openchamber.visual.field.arrowKeyPromptHistory',
+    descriptionKey: 'settings.openchamber.visual.field.arrowKeyPromptHistoryHint',
+    keywords: ['arrow', 'keys', 'up', 'down', 'history', 'recall', 'previous prompts', 'keyboard'],
+  },
+  {
     id: 'chat.large-text-paste',
     page: 'chat',
     titleKey: 'settings.openchamber.visual.field.largeTextPaste',

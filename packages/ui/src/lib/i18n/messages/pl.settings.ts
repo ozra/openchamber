@@ -1072,6 +1072,9 @@ export const settingsDict = {
 
   'settings.openchamber.visual.field.enableSpellcheckInTextInputs': 'Włącz sprawdzanie pisowni w polach tekstowych',
   'settings.openchamber.visual.field.enableSpellcheckInTextInputsAria': 'Włącz sprawdzanie pisowni w polach tekstowych',
+  'settings.openchamber.visual.field.arrowKeyPromptHistoryAria': 'Strzałki przywołują poprzednie wiadomości',
+  'settings.openchamber.visual.field.arrowKeyPromptHistory': 'Strzałki przywołują poprzednie wiadomości',
+  'settings.openchamber.visual.field.arrowKeyPromptHistoryHint': 'Gdy wyłączone, strzałki przesuwają kursor jak zwykle, zamiast przywoływać poprzednie wiadomości.',
   'settings.openchamber.visual.field.largeTextPaste': 'Wklejanie dużego tekstu',
   'settings.openchamber.visual.field.largeTextPasteHint': 'Przy wklejaniu ponad około 2000 znaków lub 25 wierszy wybierz, czy dołączyć tekst jako plik, wkleić go w treści, czy pytać za każdym razem.',
   'settings.openchamber.visual.field.largeTextPasteAria': 'Zachowanie przy wklejaniu dużego tekstu',

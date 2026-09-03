@@ -65,6 +65,37 @@ export function stepNewer(state: HistoryState, history: readonly string[]): Hist
     return { state: { ...state, index }, text: history[index] };
 }
 
+export interface PromptHistoryNavigationInput {
+    /** True when the composer holds no text at all. */
+    empty: boolean;
+    /** True when the caret sits at the very start of the text. */
+    caretAtStart: boolean;
+    /** True when the caret sits at the very end of the text. */
+    caretAtEnd: boolean;
+    /** True while an autocomplete popup owns the arrow keys. */
+    autocompleteOpen: boolean;
+}
+
+/**
+ * Whether the composer may step into prompt history on an arrow key.
+ *
+ * Default is off: the arrows move the caret unless the user opted back into
+ * walking history (chat setting "Arrow keys recall previous prompts").
+ * When enabled, ArrowUp enters only from an empty field or the start of the
+ * text, and ArrowDown only from an empty field or the end — the exact
+ * conditions the composer applied before the setting existed.
+ */
+export function canWalkPromptHistory(
+    enabled: boolean,
+    direction: 'older' | 'newer',
+    input: PromptHistoryNavigationInput,
+): boolean {
+    if (!enabled || input.autocompleteOpen) return false;
+    return direction === 'older'
+        ? input.empty || input.caretAtStart
+        : input.empty || input.caretAtEnd;
+}
+
 export interface MessageHistory {
     /** True while showing a recalled message rather than the user's draft. */
     isBrowsing: boolean;
