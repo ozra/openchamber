@@ -1,7 +1,7 @@
 ---
 id: PRD-024
 title: Arrow keys no longer recall prompt history by default
-status: in-progress
+status: done
 created: 2026-09-03
 related:
   - PRD-013
