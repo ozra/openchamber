@@ -1,61 +1,81 @@
 ---
 id: PRD-010
 title: Interface zoom shortcuts
-status: draft
+status: ready
 created: 2026-09-02
+depends_on: []
+complexity: medium
+estimated_effort: 2-4 dev-days
 related:
   - PRD-004
+  - PRD-013
 ---
 
 # PRD-010 — Interface zoom shortcuts
 
 ## Goal
 
-Add app-wide zoom via `Ctrl +`, `Ctrl -`, and `Ctrl 0` at a finer granularity
-than the browser default, so the interface can be scaled per-screen and
-per-resolution without OS-level tricks.
+Restore Chromium page zoom in Electron and expose configurable zoom-in,
+zoom-out, and reset commands. Page zoom scales the whole rendered interface,
+including text, icons, spacing, and controls.
 
 ## Background
 
-- Native Electron zoom is already neutralized in the shell:
+- Native Electron zoom is currently neutralized in the shell:
   `packages/electron/main.mjs:2656-2659` pins `setZoomFactor(1)` and resets on
-  `zoom-changed`, again at `:2680`. So the browser's own Ctrl+/Ctrl- cannot
-  zoom the app — the correct lever is the in-app global scale.
-- The global scale already exists: `fontSize` (50–200%,
-  `applyTypography`, `useUIStore.ts:2025-2049`) and scales essentially all text
-  everywhere — satisfying "any text is affected by zoom". Diffs follow along
-  when the PRD-004 override is unset.
+  `zoom-changed`, again at `:2680`. Electron therefore cannot retain Chromium's
+  normal page zoom.
+- Normal browsers already own page zoom. OpenChamber must leave their native
+  shortcuts alone rather than substituting the typography-only `fontSize`
+  setting.
+- Electron's page zoom scales CSS pixels after layout. An explicit diff font
+  size from PRD-004 therefore scales with the rest of the interface without
+  coupling the two settings.
 
 ## Requirements
 
-- Bindings (all configurable via the keyboard-shortcuts settings):
-  - `ctrl +` → zoom in
-  - `ctrl -` → zoom out
-  - `ctrl 0` → reset to 100%
+- Add configurable `zoom_in`, `zoom_out`, and `zoom_reset` commands for Electron.
+- Use platform-native default bindings:
+  - Windows/Linux: `Ctrl +`, `Ctrl -`, and `Ctrl 0`.
+  - macOS: `Command +`, `Command -`, and `Command 0`.
+- Treat Shift as implicit when the active keyboard layout requires it to type
+  `+`; the setting should display the familiar `Ctrl +` or `Command +`, not an
+  extra Shift chord.
 - Plain `+`/`-`/`0` keys only — no numpad-specific bindings (no keyboards in
   use have numpads; users can rebind anyway).
-- Each zoom step changes `fontSize` by **5 percentage points** — 50% finer than
-  the ~10% browser default, and identical to the existing settings stepper step
-  (`OpenChamberVisualSettings.tsx:1291`).
-- Clamp to the existing 50–200% range; reset returns to 100%.
-- Handlers prevent the native default so they do not fight the shell.
+- Each command changes the Electron page zoom factor by **5 percentage points**.
+- Clamp the Electron page zoom factor to 50–200%; reset returns to 100%.
+- Keep the current zoom when Electron reloads the renderer or switches between
+  HMR and bundled UI documents.
+- In web runtimes, do not register an app handler for the default zoom chords or
+  prevent their native behavior. Browser-owned zoom continues to work normally.
+- Show the configurable commands only where OpenChamber can execute them. A web
+  browser cannot programmatically control its native page zoom.
 
 ## Implementation anchors
 
-- Register `zoom_in` / `zoom_out` / `zoom_reset` in
-  `lib/shortcuts/config.ts` (application category, customizable), wire handlers
-  in `hooks/useKeyboardShortcuts.ts`, i18n labels, HelpDialog entries.
-- Handlers call `setFontSize(fontSize ± 5)` / `setFontSize(100)`
-  (`useUIStore.ts:1971`).
+- Register `zoom_in`, `zoom_out`, and `zoom_reset` in the shared shortcut schema
+  as desktop-capable configurable commands, with i18n labels and Help entries.
+- Route execution through the desktop bridge. Electron main owns
+  `webContents.getZoomFactor()` / `setZoomFactor()` and the 50–200% clamp.
+- Remove the unconditional factor-1 reset. Retain the current factor across
+  renderer reloads and apply Electron's normal same-origin zoom behavior to
+  OpenChamber windows.
 
 ## Acceptance criteria
 
-- `Ctrl +` / `Ctrl -` / `Ctrl 0` scale the whole interface; step is 5%, clamp
-  50–200%, reset restores 100%.
-- Works from composer focus and most surfaces.
-- All three are listed and configurable in Keyboard Shortcuts settings.
+- The platform-native defaults scale the whole Electron interface in 5-point
+  steps; clamp is 50–200%, and reset restores 100%.
+- Commands work from composer focus and every OpenChamber renderer surface.
+- All three are listed and configurable in Keyboard Shortcuts settings when
+  running in Electron.
+- Reloading or opening another same-origin OpenChamber window retains the
+  current zoom according to Electron's normal page-zoom behavior.
+- Web keeps the browser's native zoom behavior and does not intercept the
+  browser's default zoom chords.
 
 ## Out of scope / future
 
 - Per-surface zoom.
 - Numpad-specific bindings.
+- Replacing browser-owned zoom with an app-controlled web implementation.

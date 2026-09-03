@@ -200,7 +200,7 @@ by a 2,000 ms transition.
 Intrinsic message and part classification stays on the ordinary render path:
 
 - User, assistant, system, and control presentation.
-- Tool kind and Thinking prefix colors from PRD-011.
+- Tool-specific and Thinking prefix colors from PRD-011.
 - User-originated question-tool answers.
 - Theme tokens and normal hover/focus behavior local to a component.
 

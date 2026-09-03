@@ -23,8 +23,8 @@ related:
 
 | PRD | Scope |
 |---|---|
-| PRD-007 | Chat history scroll shortcut (Ctrl+Shift+PageUp/Down) — a constituent of this epic |
-| PRD-010 | Interface zoom shortcuts (Ctrl + / Ctrl - / Ctrl 0) |
+| PRD-007 | Chat history scroll shortcut (Ctrl+PageUp/Down on Windows/Linux) — a constituent of this epic |
+| PRD-010 | Electron page zoom shortcuts (Ctrl + / Ctrl - / Ctrl 0 on Windows/Linux) |
 | PRD-018 | Separate stackable Conversation Find view, including configurable contextual Ctrl+F |
 | (future) | New keyboard features should register here before being built |
 
@@ -60,7 +60,7 @@ is identical no matter how the picker is reached.
   The palette entry titled "Agents" (`id: settings:agents`, title "Agents",
   `lib/settings/metadata.ts:100-104`) opens Settings → OpenCode → Agents — it
   reads like a picker but is settings navigation.
-- **Chat history scroll**: `Ctrl+Shift+PageUp/Down` from composer focus is
+- **Chat history scroll**: `Ctrl+PageUp/Down` from composer focus is
   PRD-007 (a constituent of this epic).
 
 ## Requirements
@@ -90,7 +90,7 @@ is identical no matter how the picker is reached.
      so the picker and the settings page are unambiguous.
 
 5. **Chat history scroll from composer focus**
-   - `Ctrl+Shift+PageUp` / `Ctrl+Shift+PageDown` scroll chat history even when
+   - `Ctrl+PageUp` / `Ctrl+PageDown` scroll chat history even when
      the composer is focused (PRD-007).
 
 6. **Invoke consistency (cross-cutting)**
@@ -105,7 +105,7 @@ is identical no matter how the picker is reached.
 - A popped-up question card takes focus; arrows/tab/enter navigate and submit.
 - Palette "Model" and "Agents" open the same pickers as the icon and shortcut.
 - The "Agents" settings entry reads clearly as settings navigation.
-- Ctrl+Shift+PageUp/Down scrolls chat history while the composer is focused.
+- Ctrl+PageUp/Down scrolls chat history while the composer is focused.
 - No existing shortcut conflicts are introduced.
 
 ## Out of scope / future

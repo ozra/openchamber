@@ -44,7 +44,7 @@ second transcript model. Each span carries:
 | `turnId` | Owning turn from `TurnRecord`. |
 | `messageId` | Owning SDK message and the normal Find target. |
 | `partId` | Optional tool, reasoning, or text-part identity for precise targets. |
-| semantic kind | User, assistant, thinking, or shared PRD-011 tool-label kind. |
+| semantic kind | User, assistant, thinking, or the normalized PRD-011 tool identity. |
 
 Use existing authoritative IDs where available. Any fallback span ID must be
 derived deterministically from message identity, part position, and part type,
@@ -215,8 +215,8 @@ theme tokens — not `--dsw-*` CSS modules, and not imported DeepSeek packages
 (they depend on a different runtime/event model). See
 `packages/ui/src/index.css` for tokens and `components/ui` for primitives.
 
-Tool and thinking span hues come from the same PRD-011 semantic classifier and
-theme tokens as their message-prefix labels. User prompts and parsed question
+Tool and thinking span hues come from the same PRD-011 normalized tool identity
+and theme tokens as their message-prefix labels. User prompts and parsed question
 answers share the user-originated visual class. Decorations sit above these
 intrinsic styles; `dimmed` may reduce their intensity or use a dedicated muted
 treatment according to the active theme.

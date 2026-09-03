@@ -3,6 +3,12 @@ id: PRD-018
 title: Conversation Find view
 status: ready
 created: 2026-09-02
+depends_on:
+  - PRD-019
+  - PRD-022
+  - PRD-023
+complexity: large
+estimated_effort: 10-20 dev-days
 related:
   - PRD-001
   - PRD-013

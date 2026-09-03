@@ -3,6 +3,9 @@ id: PRD-020
 title: Quota usage pace against reset windows
 status: ready
 created: 2026-09-02
+depends_on: []
+complexity: medium
+estimated_effort: 3-5 dev-days
 related:
   - PRD-016
 ---

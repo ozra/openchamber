@@ -1,38 +1,42 @@
 ---
 id: PRD-004
 title: Diff view font size setting
-status: draft
+status: ready
 created: 2026-09-01
+depends_on: []
+complexity: medium
+estimated_effort: 2-4 dev-days
 related:
   - PRD-010
 ---
 
-# PRD-004 — Diff view font size (zoom-aware relative override)
+# PRD-004 — Diff view font size
 
 ## Goal
 
-Make the diff view font size adjustable independently of the global
-chat/typography scaling — while keeping it zoom-aware, never rigid.
+Give Pierre diff views their own base font-size setting. Native page zoom still
+scales that size with the rest of the interface.
 
 ## Background
 
 Diff code resolves `var(--text-code)` (`PierreDiffViewer.tsx:55-77`,
 `index.css:704`), which the global interface font-size percentage scales
 (`applyTypography`, `useUIStore.ts:2025-2049`). There is no independent control.
-Because the app zoom (PRD-010) scales `--text-code`, an absolute pinned font
-size would stop tracking zoom; the override is therefore a **relative offset**,
-so diffs keep following the scale.
+PRD-010 restores native page zoom in Electron. Browser-level zoom scales an
+explicit CSS pixel size automatically, so the diff setting does not need to be
+an offset from global typography.
 
 ## Requirements
 
 - New store field `diffFontSize: number | null`, default `null`.
   - `null` (unset): diff follows `var(--text-code)` exactly — global scale,
     zoom, and mobile 14px. No default visual change.
-  - set: a **relative px offset** over `--text-code`, clamped (e.g. −4..+8),
-    applied as `calc(var(--text-code) + <offset>px)` through an
-    `--oc-diff-font-size` custom property. Keeps tracking zoom/scale.
+  - set: an explicit base size in CSS pixels at 100% page zoom, clamped to
+    9–32px and applied through `--oc-diff-font-size`. Native browser/Electron
+    page zoom scales the rendered result with the rest of the interface.
 - A setting control in Visual settings "Density & type" next to the
-  editor/terminal font size; reset restores "follow theme".
+  editor/terminal font size. It uses 1px steps, shows "Follow theme" while
+  unset, and provides a reset that restores `null`.
 - Persists across sessions (web + desktop autosave).
 
 ## Scope — surfaces
@@ -64,8 +68,8 @@ Explicitly out of scope: chat inline tool diffs (`PatchDiff` via
 ## Acceptance criteria
 
 - Unset is pixel-identical to today at any global scale and on mobile.
-- A set offset shifts only diff text; the offset is preserved as the scale
-  changes (still zoom-aware).
+- A set 9–32px base size changes only Pierre diff text and scales with native
+  browser/Electron page zoom.
 - Persists across sessions; reset restores follow-theme.
 
 ## Out of scope / future

@@ -31,6 +31,10 @@ title: Keyboard navigation and focus
 kind: epic            # optional: coordinating doc for several related PRDs
 status: draft
 created: 2026-09-02
+depends_on: []
+deliver_with: []          # optional: PRDs implemented and validated together
+complexity: medium        # trivial | small | medium | large | epic
+estimated_effort: 2-4 dev-days
 related:
   - PRD-007
 ---
@@ -42,7 +46,7 @@ Status lives in frontmatter only (not in the body). Lifecycle:
 |---|---|
 | `draft` | Idea captured; requirements may still be rough, direction is clear. |
 | `discover` | Needs codebase research before requirements can be concrete (e.g. "functionality may already exist" — verify first). |
-| `ready` | Researched, requirements concrete, approved for implementation. |
+| `ready` | Researched, requirements concrete, and approved. Start when every `depends_on` PRD is done. |
 | `in-progress` | Being implemented. |
 | `done` | Shipped; acceptance criteria met. |
 | `closed` | Won't build / superseded / parked. Record the reason; use `superseded-by` when another PRD absorbed it. |
@@ -52,6 +56,20 @@ Normal flow: `draft` → `discover` (when needed) → `ready` → `in-progress` 
 `done`. `closed` and `deferred` are end/park states; superseded work points at
 the PRD that replaced it. On reaching a terminal state, move the file into
 `done/`.
+
+Planning metadata is required before a PRD becomes `ready`:
+
+- `depends_on` lists hard blockers only. Use an explicit empty list when the
+  dependency check is complete and the PRD can start independently.
+- `deliver_with` is optional. It groups PRDs that should be implemented and
+  validated in one batch without inventing a circular dependency.
+- `complexity` records implementation difficulty, not product value. Use one of
+  `trivial`, `small`, `medium`, `large`, or `epic`.
+- `estimated_effort` is an engineering estimate that includes implementation
+  and automated validation. Record visual or user-feedback iteration separately
+  in the PRD when it cannot be estimated in dev-days.
+- `related` remains informational. A related PRD neither blocks nor joins the
+  delivery unless frontmatter says so explicitly.
 
 ## Epics
 
