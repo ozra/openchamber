@@ -1,4 +1,4 @@
-# custom-dev — Personal OpenChamber customization docs
+# custom-dev: Personal OpenChamber customization docs
 
 This directory holds the personal requirement (PRD) and technical design documents
 for customizations I am building on top of OpenChamber. It is **fork-owned** work:
@@ -10,21 +10,60 @@ track, and (where feasible) later turn into upstreamable modules.
 
 ## How to use this directory
 
-- `PRD-*.md` — one requirement document per feature. Numbered for easy
+- `PRD-*.md`: one requirement document per feature. Numbered for easy
   reference, with the kind in the name when coordinating: `PRD-001-foo-bar.md`,
   `PRD-013-EPIC-keyboard-navigation-focus.md`. The files themselves are the live
-  index — there is no PRD list in this README; find them by `glob custom-dev/*.md`.
-- `done/` — PRDs that reached a terminal state (`done` / `closed`)
+  index. There is no PRD list in this README; use a targeted glob or search to
+  locate a requested PRD.
+- `PRD-inbox.md`: the raw-idea inbox. The maintainer drops rough, unformatted
+  wishes here; converting them into formal PRD files is a dedicated workflow
+  (see "PRD inbox" below), not something done inside the inbox itself.
+- `done/`: PRDs that reached a terminal state (`done` / `closed`)
   move here when they reach that state, keeping the working set clean.
-- `DOCUMENTATION.md` — the shared technical design: data model, projection
+- `DOCUMENTATION.md`: the shared technical design for data models, projection
   algorithms, layout rules. PRDs describe *what*; this describes *how*.
-- `README.md` — this file: the ways of working, not an index.
+- `README.md`: this file. It defines the ways of working, not the PRD index.
+
+Load PRD context on demand. Start with the PRDs named in the request and follow
+every PRD reference recursively, whether it appears in frontmatter or the body.
+If no PRD is named, search filenames and frontmatter for likely matches. Read
+only those candidates and their reference chains. A file listing is a discovery
+tool, not a reading list. Never read the full backlog without a specific reason.
 
 When listing or mentioning a PRD to the user, include its full filename or title
 alongside the PRD number. For example, use
 `PRD-020-quota-usage-pace-indicator.md` or "PRD-020 - Quota usage pace against
 reset windows", rather than `PRD-020` alone. The number is useful for reference,
 but the filename or title tells the user which PRD it is.
+
+## PRD inbox
+
+`PRD-inbox.md` is the maintainer's scratch pad for raw feature ideas. It is
+deliberately unstructured: ideas get added as they come, possibly as fragments,
+in whatever language, without frontmatter or formatting.
+
+When the maintainer says something like "handle prd inbox" (or "process the
+inbox", "turn the inbox into PRDs"), perform this workflow:
+
+1. Read every entry in `PRD-inbox.md`.
+2. Group entries that are clearly one feature into a single PRD; split entries
+   that are clearly several features. When grouping or splitting is ambiguous,
+   ask before deciding.
+3. For each resulting feature, create a new `PRD-*.md` in this directory with
+   proper frontmatter (`status: draft`, next free PRD number). The inbox entry
+   is the seed — expand it into a real requirement document: goal, background
+   on current state, requirements, acceptance criteria, out of scope. Verify
+   current state in the codebase so the background is accurate, and ask the
+   maintainer about anything unclear before finalizing requirements.
+4. Link related PRDs (frontmatter `related:` lists and epic "Related PRDs"
+   tables) when the new PRD touches an existing epic or requirement's scope.
+5. Move each processed entry under a "→ PRD-0xx" pointer in the inbox as it is
+   converted, so the inbox stays as a history of what was captured. Leave the
+   unwritten remainder as the active backlog.
+6. Report the created PRDs (full filename with title) and any open questions.
+
+The inbox is for capture only: do not implement directly from inbox entries,
+and do not let an entry linger there once it has a PRD.
 
 ## PRD format and status
 
@@ -51,17 +90,21 @@ Status lives in frontmatter only (not in the body). Lifecycle:
 | Status | Meaning |
 |---|---|
 | `draft` | Idea captured; requirements may still be rough, direction is clear. |
-| `discover` | Needs codebase research before requirements can be concrete (e.g. "functionality may already exist" — verify first). |
+| `discover` | Needs codebase research before requirements can be concrete. For example, verify whether the functionality already exists. |
 | `ready` | Researched, requirements concrete, and approved. Start when every `depends_on` PRD is done. |
 | `in-progress` | Being implemented. |
-| `done` | Shipped; acceptance criteria met. |
-| `closed` | Won't build / superseded / parked. Record the reason; use `superseded-by` when another PRD absorbed it. |
+| `done` | Implemented, validated, tested by the user, and explicitly accepted by the user. |
+| `closed` | Won't build, superseded, or parked. Only the user may choose this status. Record the reason and use `superseded-by` when another PRD absorbed it. |
 | `deferred` | Captured but deliberately not scheduled now (recorded so the requirement is not lost). |
 
 Normal flow: `draft` → `discover` (when needed) → `ready` → `in-progress` →
-`done`. `closed` and `deferred` are end/park states; superseded work points at
-the PRD that replaced it. On reaching a terminal state, move the file into
-`done/`.
+`done`. A `deferred` PRD stays in the main directory until work resumes or the
+user closes it. Move only `done` and `closed` PRDs into `done/`. Superseded work
+points to the PRD that replaced it.
+
+Never mark a PRD `done` based on implementation or automated checks alone. The
+user must test the behavior and explicitly accept it first. Never mark a PRD
+`closed` unless the user does so or directly instructs you to do so.
 
 Commit messages for PRD implementation work include the PRD number for every
 PRD implemented in that commit. For example, a commit implementing both
@@ -86,12 +129,9 @@ Planning metadata is required before a PRD becomes `ready`:
 When several PRDs share one theme, mark the coordinating PRD `kind: epic` and
 put `-EPIC-` in its filename after the id-number. The epic holds the cross-
 cutting rules and a "Related PRDs" list; the individual PRDs carry their own
-detail and a `related` back-reference. Before implementing a feature in an
-epic's theme, read the epic so the change follows the shared pattern instead
-of becoming a special case.
-
-Find epics by scanning frontmatter (`grep -l "kind: epic" custom-dev/*.md`) —
-there is no maintained list to go stale.
+detail and a `related` back-reference. Epics are descriptive, not a separate
+discovery step. A related PRD must reference its epic so the normal recursive
+lookup reaches it. Never scan the backlog just to look for epics.
 
 ## Fork customization strategy
 
@@ -134,6 +174,26 @@ allowlist controls both writes to `settings.json` and fields returned by the
 settings API. Add a focused sanitizer/response test in
 `settings-helpers.test.js`. Without the server entry, the UI appears to save the
 setting but resets it to the client default after a restart.
+
+## Validation and user acceptance
+
+Run the tightest automated validation that directly exercises the change. Start
+with focused tests and checks for the files or package changed. Run broader
+checks only when the change crosses package contracts, changes root tooling or
+generated assets, or focused validation cannot establish correctness. A broad
+command is not justified only because repository guidance mentions it. Checks
+whose documented trigger matches the change remain part of the minimum set.
+
+For runnable behavior changes, use this order:
+
+1. Run enough focused validation to be confident the change is ready to try.
+2. Ask the user to perform user acceptance testing and provide concrete steps.
+3. After user acceptance testing passes, list any additional recommended checks
+   as numbered choices. Include each exact command and what it would verify,
+   plus a choice to skip them. Ask which choices to run instead of running every
+   optional check automatically.
+4. Run the selected checks. Mark the PRD `done` only after the user explicitly
+   accepts the result and every selected check passes.
 
 ## Cross-cutting note on data reality
 

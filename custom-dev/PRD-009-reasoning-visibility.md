@@ -3,6 +3,8 @@ id: PRD-009
 title: Reasoning visibility in chat
 status: discover
 created: 2026-09-01
+related:
+  - PRD-027
 ---
 
 # PRD-009 — Reasoning visibility in chat

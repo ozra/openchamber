@@ -11,9 +11,9 @@ This file contains only always-on repository rules and routing. Detailed workflo
 `custom-dev/` is the maintainer's personal PRD backlog for OpenChamber
 customizations. Before any fork-local work — refining or adding a PRD,
 implementing a customized feature, or touching `custom-dev/` — read
-`custom-dev/README.md` and the PRD files under `custom-dev/` (the PRDs are the
-live index). When several PRDs share a theme, a PRD marked `kind: epic`
-coordinates them; check for one before adding special-case rules.
+`custom-dev/README.md`. It is the canonical workflow for selecting relevant
+PRDs and references, planning fork work, validation, and user acceptance. Follow
+its context-loading rules instead of reading the whole PRD backlog.
 
 ## Instruction Order
 

@@ -8,6 +8,7 @@ related:
   - PRD-007
   - PRD-010
   - PRD-018
+  - PRD-026
 ---
 
 # PRD-013 — Keyboard navigation and focus
@@ -26,6 +27,7 @@ related:
 | PRD-007 | Chat history scroll shortcut (Ctrl+PageUp/Down on Windows/Linux) — a constituent of this epic |
 | PRD-010 | Electron page zoom shortcuts (Ctrl + / Ctrl - / Ctrl 0 on Windows/Linux) |
 | PRD-018 | Separate stackable Conversation Find view, including configurable contextual Ctrl+F |
+| PRD-026 | Require choosing a project for new sessions — the new-session draft opens its project picker focused with arrow-key navigation (invoke-consistency applies) |
 | (future) | New keyboard features should register here before being built |
 
 ## Goal
