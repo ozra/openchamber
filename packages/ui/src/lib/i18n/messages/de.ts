@@ -200,6 +200,8 @@ export const dict = {
   'sessions.sidebar.header.actions.closeSessions': 'Sitzungen schließen',
   'sessions.sidebar.header.actions.addProject': 'Projekt hinzufügen',
   'sessions.sidebar.header.actions.newSession': 'Neue Sitzung',
+  'sessions.sidebar.header.actions.keepSidebarOpen': 'Seitenleiste geöffnet lassen',
+  'sessions.sidebar.header.actions.autoCloseSidebar': 'Seitenleiste nach dem Auswählen oder Starten einer Sitzung automatisch schließen',
   'sessions.sidebar.header.actions.newMultiRun': 'Neuer Multi-Run',
   'sessions.sidebar.header.actions.scheduledTasks': 'Geplante Aufgaben',
   'sessions.scheduledTasks.dialog.title': 'Geplante Aufgaben',

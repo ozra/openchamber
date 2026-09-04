@@ -64,6 +64,8 @@ export const dict = {
   'sessions.sidebar.header.actions.closeSessions': 'Fermer les sessions',
   'sessions.sidebar.header.actions.addProject': 'Ajouter un projet',
   'sessions.sidebar.header.actions.newSession': 'Nouvelle session',
+  'sessions.sidebar.header.actions.keepSidebarOpen': 'Garder la barre latérale ouverte',
+  'sessions.sidebar.header.actions.autoCloseSidebar': 'Fermer automatiquement la barre latérale après la sélection ou le démarrage d\'une session',
   'sessions.sidebar.header.actions.newMultiRun': 'Nouveau multi-run',
   'sessions.sidebar.header.actions.scheduledTasks': 'Tâches planifiées',
   'sessions.scheduledTasks.dialog.title': 'Tâches planifiées',

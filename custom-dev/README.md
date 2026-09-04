@@ -125,6 +125,16 @@ additive variant or direct shared modification, why, what remains shared, and
 the smallest required core integration. This is a decision rule, not a demand
 to copy every component.
 
+## Adding persisted settings
+
+A shared setting must survive the full round trip. Add its client type, store
+default and setter, hydration/apply logic, and write path. Then add it to the
+server allowlist in `packages/web/server/lib/opencode/settings-helpers.js`; that
+allowlist controls both writes to `settings.json` and fields returned by the
+settings API. Add a focused sanitizer/response test in
+`settings-helpers.test.js`. Without the server entry, the UI appears to save the
+setting but resets it to the client default after a restart.
+
 ## Cross-cutting note on data reality
 
 Several PRDs depend on timing and token data. The governing constraint

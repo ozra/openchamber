@@ -71,6 +71,12 @@ export type DesktopSettings = {
   sidebarSessionGroupingMode?: 'by-worktree' | 'flat';
   sidebarProjectSortOrder?: 'manual' | 'a-z' | 'z-a' | 'date-added' | 'recent';
   sidebarShowRecentSection?: boolean;
+  /** Sidebar stays open after selecting or starting a session (PRD-014 pin). */
+  sidebarKeepOpen?: boolean;
+  /** Hide the sidebar header "New session" button (PRD-014). */
+  sidebarHideHeaderNewSession?: boolean;
+  /** Always show project/group icons at rest instead of hover-revealing (PRD-015). */
+  sidebarActionsAlwaysVisible?: boolean;
   securityScopedBookmarks?: string[];
   pinnedDirectories?: string[];
   showReasoningTraces?: boolean;

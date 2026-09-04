@@ -567,6 +567,9 @@ const materializeAuthoritativeUiSettings = (settings: DesktopSettings): DesktopS
     maxLastMessageLength: defaults.maxLastMessageLength,
     inputSpellcheckEnabled: defaults.inputSpellcheckEnabled,
     arrowKeyPromptHistoryEnabled: defaults.arrowKeyPromptHistoryEnabled,
+    sidebarKeepOpen: defaults.sidebarKeepOpen,
+    sidebarHideHeaderNewSession: defaults.sidebarHideHeaderNewSession,
+    sidebarActionsAlwaysVisible: defaults.sidebarActionsAlwaysVisible,
     showOpenCodeUpdateNotifications: defaults.showOpenCodeUpdateNotifications,
     agentControlToolEnabled: defaults.agentControlToolEnabled,
     agentWebToolEnabled: defaults.agentWebToolEnabled,
@@ -739,6 +742,15 @@ const applyDesktopUiPreferences = (settings: DesktopSettings) => {
   }
   if (typeof settings.arrowKeyPromptHistoryEnabled === 'boolean' && settings.arrowKeyPromptHistoryEnabled !== store.arrowKeyPromptHistoryEnabled) {
     store.setArrowKeyPromptHistoryEnabled(settings.arrowKeyPromptHistoryEnabled);
+  }
+  if (typeof settings.sidebarKeepOpen === 'boolean' && settings.sidebarKeepOpen !== store.sidebarKeepOpen) {
+    store.setSidebarKeepOpen(settings.sidebarKeepOpen);
+  }
+  if (typeof settings.sidebarHideHeaderNewSession === 'boolean' && settings.sidebarHideHeaderNewSession !== store.sidebarHideHeaderNewSession) {
+    store.setSidebarHideHeaderNewSession(settings.sidebarHideHeaderNewSession);
+  }
+  if (typeof settings.sidebarActionsAlwaysVisible === 'boolean' && settings.sidebarActionsAlwaysVisible !== store.sidebarActionsAlwaysVisible) {
+    store.setSidebarActionsAlwaysVisible(settings.sidebarActionsAlwaysVisible);
   }
   if (
     typeof settings.showOpenCodeUpdateNotifications === 'boolean'
@@ -1445,6 +1457,15 @@ const sanitizeWebSettings = (payload: unknown): DesktopSettings | null => {
   }
   if (typeof candidate.arrowKeyPromptHistoryEnabled === 'boolean') {
     result.arrowKeyPromptHistoryEnabled = candidate.arrowKeyPromptHistoryEnabled;
+  }
+  if (typeof candidate.sidebarKeepOpen === 'boolean') {
+    result.sidebarKeepOpen = candidate.sidebarKeepOpen;
+  }
+  if (typeof candidate.sidebarHideHeaderNewSession === 'boolean') {
+    result.sidebarHideHeaderNewSession = candidate.sidebarHideHeaderNewSession;
+  }
+  if (typeof candidate.sidebarActionsAlwaysVisible === 'boolean') {
+    result.sidebarActionsAlwaysVisible = candidate.sidebarActionsAlwaysVisible;
   }
   if (typeof candidate.showOpenCodeUpdateNotifications === 'boolean') {
     result.showOpenCodeUpdateNotifications = candidate.showOpenCodeUpdateNotifications;

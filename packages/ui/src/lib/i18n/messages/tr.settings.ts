@@ -2230,5 +2230,13 @@ export const settingsDict = {
   'settings.openchamber.visual.field.sessionTabsAria': 'Başlıktaki session sekmelerini aç/kapat',
   'settings.openchamber.visual.field.sessionTabsInfo': 'Açtığınız session\'lar başlıkta sekmeler olarak dizilir. Kapatırsanız düz session başlığına döner.',
   ...thirdPartyIntegrationI18n.tr,
+  'settings.openchamber.sidebar.title': 'Kenar çubuğu',
+  'settings.openchamber.sidebar.tooltip': 'Bir işlemden sonra oturum kenar çubuğunun davranışı.',
+  'settings.openchamber.sidebar.field.hideHeaderNewSession': 'Üstteki Yeni oturum düğmesini gizle',
+  'settings.openchamber.sidebar.field.hideHeaderNewSessionAria': 'Kenar çubuğu üst kısmındaki Yeni oturum düğmesini gizle',
+  'settings.openchamber.sidebar.field.hideHeaderNewSessionHint': 'Genel Yeni oturum düğmesini gizler. Yeni oturumlar artık proje başlığından veya menüsünden başlatılır.',
+  'settings.openchamber.sidebar.field.actionsAlwaysVisible': 'Kenar çubuğu eylem simgelerini her zaman göster',
+  'settings.openchamber.sidebar.field.actionsAlwaysVisibleAria': 'Kenar çubuğu eylem simgelerini her zaman göster',
+  'settings.openchamber.sidebar.field.actionsAlwaysVisibleHint': 'Proje ve grup eylem simgelerini yalnızca üzerine gelince değil, her zaman yumuşak bir tonda gösterir.',
   ...linearIntegrationI18n.tr,
 };

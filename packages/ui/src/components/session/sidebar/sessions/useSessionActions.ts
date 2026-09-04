@@ -52,6 +52,7 @@ export const useSessionActions = (args: Args) => {
   deleteSessionConfirmRef.current = args.deleteSessionConfirm;
 
   const setSessionSwitcherOpen = useUIStore((state) => state.setSessionSwitcherOpen);
+  const sidebarKeepOpen = useUIStore((state) => state.sidebarKeepOpen);
   const setCurrentSession = useSessionUIStore((state) => state.setCurrentSession);
   const updateSessionTitle = useSessionUIStore((state) => state.updateSessionTitle);
   const shareSession = useSessionUIStore((state) => state.shareSession);
@@ -104,6 +105,15 @@ export const useSessionActions = (args: Args) => {
         setSessionSwitcherOpen(false);
       }
 
+      // PRD-014: the sidebar pin controls keep-open vs auto-close. When
+      // unpinned (auto-close), picking a session closes the desktop sidebar so
+      // the chat gets the reclaimed space. Mobile and VS Code manage their
+      // own switcher/sidebar visibility, so this stays a desktop/web sidebar
+      // behavior.
+      if (sidebarKeepOpen === false && !mobileVariant) {
+        useUIStore.getState().setSidebarOpen(false);
+      }
+
       if (sessionId === useSessionUIStore.getState().currentSessionId) {
         if (allowReselect) {
           onSessionSelected?.(sessionId);
@@ -116,7 +126,7 @@ export const useSessionActions = (args: Args) => {
       onSessionSelected?.(sessionId);
       resetSessionSearch();
     },
-    [allowReselect, isSessionSearchOpen, mobileVariant, onSessionSelected, sessionSearchQuery, setCurrentSession, setIsSessionSearchOpen, setSessionSearchQuery, setSessionSwitcherOpen],
+    [allowReselect, isSessionSearchOpen, mobileVariant, onSessionSelected, sessionSearchQuery, setCurrentSession, setIsSessionSearchOpen, setSessionSearchQuery, setSessionSwitcherOpen, sidebarKeepOpen],
   );
 
   const handleSessionDoubleClick = React.useCallback((sessionId: string, sessionTitle: string) => {

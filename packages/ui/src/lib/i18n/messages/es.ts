@@ -234,6 +234,8 @@ export const dict: Record<I18nKey, string> = {
   "sessions.sidebar.header.actions.closeSessions": "Cerrar sesiones",
   "sessions.sidebar.header.actions.addProject": "Añadir proyecto",
   "sessions.sidebar.header.actions.newSession": "Nueva sesión",
+  "sessions.sidebar.header.actions.keepSidebarOpen": "Mantener la barra lateral abierta",
+  "sessions.sidebar.header.actions.autoCloseSidebar": "Cerrar la barra lateral automáticamente al seleccionar o iniciar una sesión",
   "sessions.sidebar.header.actions.newMultiRun": "Nuevo multi-run",
   "sessions.sidebar.header.actions.scheduledTasks": "Tareas programadas",
   "sessions.scheduledTasks.dialog.title": "Tareas programadas",

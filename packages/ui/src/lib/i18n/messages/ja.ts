@@ -234,6 +234,8 @@ export const dict: Record<I18nKey, string> = {
   'sessions.sidebar.header.actions.closeSessions': 'セッションを閉じる',
   'sessions.sidebar.header.actions.addProject': 'プロジェクトを追加',
   'sessions.sidebar.header.actions.newSession': '新しいセッション',
+  'sessions.sidebar.header.actions.keepSidebarOpen': 'サイドバーを開いたままにする',
+  'sessions.sidebar.header.actions.autoCloseSidebar': 'セッションの選択または開始後にサイドバーを自動的に閉じる',
   'sessions.sidebar.header.actions.newMultiRun': '新規マルチラン',
   'sessions.sidebar.header.actions.scheduledTasks': 'スケジュールタスク',
   'sessions.scheduledTasks.dialog.title': 'スケジュールタスク',

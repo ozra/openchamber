@@ -303,6 +303,11 @@ function SessionGroupSectionBase(props: SessionGroupSectionProps): React.ReactNo
   const deleteFolder = useSessionFoldersStore((state) => state.deleteFolder);
   const addSessionToFolder = useSessionFoldersStore((state) => state.addSessionToFolder);
   const showDeletionDialog = useUIStore((state) => state.showDeletionDialog);
+  // PRD-015: the fork setting keeps group-header action icons visible at rest
+  // (muted) instead of hover-revealing them. Session rows below keep their own
+  // hover-reveal — the header is the targeted surface here.
+  const sidebarActionsAlwaysVisible = useUIStore((state) => state.sidebarActionsAlwaysVisible);
+  const headerActionsVisibleAtRest = alwaysShowActions || sidebarActionsAlwaysVisible;
   const [deleteFolderConfirm, setDeleteFolderConfirm] = React.useState<DeleteFolderConfirm>(null);
   const compareSessionNodes = React.useCallback((a: SessionNode, b: SessionNode) => {
     const aIndex = sessionOrderIndex.get(a.session.id);
@@ -900,7 +905,7 @@ function SessionGroupSectionBase(props: SessionGroupSectionProps): React.ReactNo
   // Reserve room for the hover-revealed header actions (new draft + delete
   // worktree) so they never overlap the label / PR badge.
   const hasWorktreeDeleteAction = Boolean(!group.isMain && group.worktree);
-  const groupHeaderRightPadding = alwaysShowActions
+  const groupHeaderRightPadding = headerActionsVisibleAtRest
     ? (hasWorktreeDeleteAction ? 'pr-14' : 'pr-7')
     : (hasWorktreeDeleteAction
         ? 'pr-2 group-hover/gh:pr-14 group-focus-within/gh:pr-14'
@@ -1199,7 +1204,7 @@ function SessionGroupSectionBase(props: SessionGroupSectionProps): React.ReactNo
           </div>
         </div>
         {group.isArchivedBucket && allGroupSessions.length > 0 ? (
-          <div className={cn('absolute right-0.5 top-1/2 -translate-y-1/2 z-10 transition-opacity', alwaysShowActions ? 'opacity-100' : 'opacity-0 group-hover/gh:opacity-100 group-focus-within/gh:opacity-100')}>
+          <div className={cn('absolute right-0.5 top-1/2 -translate-y-1/2 z-10 transition-opacity', headerActionsVisibleAtRest ? 'opacity-100' : 'opacity-0 group-hover/gh:opacity-100 group-focus-within/gh:opacity-100')}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
@@ -1222,7 +1227,7 @@ function SessionGroupSectionBase(props: SessionGroupSectionProps): React.ReactNo
           </div>
         ) : null}
         {group.directory && !group.isMain && group.worktree ? (
-          <div className={cn('absolute right-7 top-1/2 -translate-y-1/2 z-10 transition-opacity', alwaysShowActions ? 'opacity-100' : 'opacity-0 group-hover/gh:opacity-100 group-focus-within/gh:opacity-100')}>
+          <div className={cn('absolute right-7 top-1/2 -translate-y-1/2 z-10 transition-opacity', headerActionsVisibleAtRest ? 'opacity-100' : 'opacity-0 group-hover/gh:opacity-100 group-focus-within/gh:opacity-100')}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
@@ -1246,7 +1251,7 @@ function SessionGroupSectionBase(props: SessionGroupSectionProps): React.ReactNo
           </div>
         ) : null}
         {group.directory ? (
-          <div className={cn('absolute right-0.5 top-1/2 -translate-y-1/2 z-10 transition-opacity', alwaysShowActions ? 'opacity-100' : 'opacity-0 group-hover/gh:opacity-100 group-focus-within/gh:opacity-100')}>
+          <div className={cn('absolute right-0.5 top-1/2 -translate-y-1/2 z-10 transition-opacity', headerActionsVisibleAtRest ? 'opacity-100' : 'opacity-0 group-hover/gh:opacity-100 group-focus-within/gh:opacity-100')}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button

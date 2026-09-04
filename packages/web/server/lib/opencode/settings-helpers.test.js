@@ -74,18 +74,49 @@ describe('settings helpers', () => {
       sidebarSessionGroupingMode: 'flat',
       sidebarProjectSortOrder: 'z-a',
       sidebarShowRecentSection: false,
+      sidebarKeepOpen: false,
+      sidebarHideHeaderNewSession: true,
+      sidebarActionsAlwaysVisible: true,
     })).toEqual({
       sidebarProjectDisplayMode: 'single',
       sidebarSessionGroupingMode: 'flat',
       sidebarProjectSortOrder: 'z-a',
       sidebarShowRecentSection: false,
+      sidebarKeepOpen: false,
+      sidebarHideHeaderNewSession: true,
+      sidebarActionsAlwaysVisible: true,
     });
     expect(helpers.sanitizeSettingsUpdate({
       sidebarProjectDisplayMode: 'grid',
       sidebarSessionGroupingMode: 'project',
       sidebarProjectSortOrder: 'random',
       sidebarShowRecentSection: 'false',
+      sidebarKeepOpen: 'false',
+      sidebarHideHeaderNewSession: 1,
+      sidebarActionsAlwaysVisible: null,
     })).toEqual({});
+
+    expect(helpers.formatSettingsResponse({
+      sidebarKeepOpen: false,
+      sidebarHideHeaderNewSession: true,
+      sidebarActionsAlwaysVisible: true,
+    })).toMatchObject({
+      sidebarKeepOpen: false,
+      sidebarHideHeaderNewSession: true,
+      sidebarActionsAlwaysVisible: true,
+    });
+  });
+
+  it('accepts arrow-key prompt history as a persisted shared setting', () => {
+    const helpers = createTestHelpers();
+
+    expect(helpers.sanitizeSettingsUpdate({ arrowKeyPromptHistoryEnabled: true })).toEqual({
+      arrowKeyPromptHistoryEnabled: true,
+    });
+    expect(helpers.sanitizeSettingsUpdate({ arrowKeyPromptHistoryEnabled: false })).toEqual({
+      arrowKeyPromptHistoryEnabled: false,
+    });
+    expect(helpers.sanitizeSettingsUpdate({ arrowKeyPromptHistoryEnabled: 'false' })).toEqual({});
   });
 
   it('accepts only booleans for wide chat layout', () => {

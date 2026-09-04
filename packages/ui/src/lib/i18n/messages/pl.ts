@@ -235,6 +235,8 @@ export const dict: Record<I18nKey, string> = {
   'sessions.sidebar.header.actions.closeSessions': 'Zamknij sesje',
   'sessions.sidebar.header.actions.addProject': 'Dodaj projekt',
   'sessions.sidebar.header.actions.newSession': 'Nowa sesja',
+  'sessions.sidebar.header.actions.keepSidebarOpen': 'Zostaw pasek boczny otwarty',
+  'sessions.sidebar.header.actions.autoCloseSidebar': 'Automatycznie zamykaj pasek boczny po wybraniu lub rozpoczęciu sesji',
   'sessions.sidebar.header.actions.newMultiRun': 'Nowe wielokrotne uruchomienie',
   'sessions.sidebar.header.actions.scheduledTasks': 'Zaplanowane zadania',
   'sessions.sidebar.header.actions.searchSessions': 'Szukaj sesji',

@@ -258,6 +258,17 @@ export const createSettingsHelpers = (dependencies) => {
     if (typeof candidate.sidebarShowRecentSection === 'boolean') {
       result.sidebarShowRecentSection = candidate.sidebarShowRecentSection;
     }
+    // Fork sidebar behavior (PRD-014/015): keep-open pin, header new-session
+    // hide, and at-rest action-icon reveal all persist as shared settings.
+    if (candidate.sidebarKeepOpen === true || candidate.sidebarKeepOpen === false) {
+      result.sidebarKeepOpen = candidate.sidebarKeepOpen;
+    }
+    if (candidate.sidebarHideHeaderNewSession === true || candidate.sidebarHideHeaderNewSession === false) {
+      result.sidebarHideHeaderNewSession = candidate.sidebarHideHeaderNewSession;
+    }
+    if (candidate.sidebarActionsAlwaysVisible === true || candidate.sidebarActionsAlwaysVisible === false) {
+      result.sidebarActionsAlwaysVisible = candidate.sidebarActionsAlwaysVisible;
+    }
 
     if (Array.isArray(candidate.securityScopedBookmarks)) {
       result.securityScopedBookmarks = normalizeStringArray(candidate.securityScopedBookmarks);
@@ -518,6 +529,9 @@ export const createSettingsHelpers = (dependencies) => {
     }
     if (typeof candidate.inputSpellcheckEnabled === 'boolean') {
       result.inputSpellcheckEnabled = candidate.inputSpellcheckEnabled;
+    }
+    if (candidate.arrowKeyPromptHistoryEnabled === true || candidate.arrowKeyPromptHistoryEnabled === false) {
+      result.arrowKeyPromptHistoryEnabled = candidate.arrowKeyPromptHistoryEnabled;
     }
     if (typeof candidate.showOpenCodeUpdateNotifications === 'boolean') {
       result.showOpenCodeUpdateNotifications = candidate.showOpenCodeUpdateNotifications;

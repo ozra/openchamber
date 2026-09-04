@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { PROJECT_COLOR_MAP, PROJECT_ICON_MAP, ProjectIconImage } from '@/lib/projectMeta';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { useSessionDisplayStore } from '@/stores/useSessionDisplayStore';
+import { useUIStore } from '@/stores/useUIStore';
 import { useI18n } from '@/lib/i18n';
 
 export type SortableDragHandleProps = {
@@ -159,6 +160,11 @@ export const SortableProjectItem: React.FC<SortableProjectItemProps> = ({
 }) => {
   const { t } = useI18n();
   const stickyZoneHeaders = useSessionDisplayStore((state) => state.stickyZoneHeaders);
+  // PRD-015: the fork setting keeps project-row action icons visible at rest
+  // (muted) instead of hover-revealing them. The collapse chevron / identity
+  // icon swap stays keyed to `alwaysShowActions` (touch layout) as before.
+  const sidebarActionsAlwaysVisible = useUIStore((state) => state.sidebarActionsAlwaysVisible);
+  const actionsVisibleAtRest = alwaysShowActions || sidebarActionsAlwaysVisible;
   const {
     attributes,
     listeners,
@@ -313,8 +319,8 @@ export const SortableProjectItem: React.FC<SortableProjectItemProps> = ({
                       className={cn(
                         'flex-1 min-w-0 flex items-center gap-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-md cursor-grab active:cursor-grabbing transition-[padding]',
                         isRepo && !hideDirectoryControls
-                          ? (alwaysShowActions ? 'pr-20' : 'pr-7 group-hover/project:pr-20 group-focus-within/project:pr-20')
-                          : (alwaysShowActions ? 'pr-14' : 'pr-7 group-hover/project:pr-14 group-focus-within/project:pr-14'),
+                          ? (actionsVisibleAtRest ? 'pr-20' : 'pr-7 group-hover/project:pr-20 group-focus-within/project:pr-20')
+                          : (actionsVisibleAtRest ? 'pr-14' : 'pr-7 group-hover/project:pr-14 group-focus-within/project:pr-14'),
                       )}
                     >
                     <ProjectHeaderIdentity
@@ -352,7 +358,7 @@ export const SortableProjectItem: React.FC<SortableProjectItemProps> = ({
                         }}
                         className={cn(
                         'inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 hover:text-foreground transition-opacity',
-                          alwaysShowActions ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto group-focus-within/project:opacity-100 group-focus-within/project:pointer-events-auto',
+                          actionsVisibleAtRest ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto group-focus-within/project:opacity-100 group-focus-within/project:pointer-events-auto',
                         )}
                         aria-label={t('sessions.sidebar.project.actions.newWorktree')}
                       >
@@ -377,7 +383,7 @@ export const SortableProjectItem: React.FC<SortableProjectItemProps> = ({
                           'inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 hover:text-foreground',
                           isMenuOpen
                             ? 'opacity-100 pointer-events-auto'
-                            : alwaysShowActions
+                            : actionsVisibleAtRest
                               ? 'opacity-100'
                               : 'opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto group-focus-within/project:opacity-100 group-focus-within/project:pointer-events-auto',
                         )}
@@ -408,7 +414,7 @@ export const SortableProjectItem: React.FC<SortableProjectItemProps> = ({
                         }}
                         className={cn(
                           'inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 transition-opacity',
-                          alwaysShowActions ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto group-focus-within/project:opacity-100 group-focus-within/project:pointer-events-auto',
+                          actionsVisibleAtRest ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto group-focus-within/project:opacity-100 group-focus-within/project:pointer-events-auto',
                         )}
                         aria-label={isRepo
                           ? t('sessions.sidebar.project.actions.newDraftSession')

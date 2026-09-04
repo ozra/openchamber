@@ -535,6 +535,22 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     isAvailable: (ctx) => !ctx.isVSCode && useUIStore.getState().agentMemoryFeatureAvailable,
   },
   {
+    id: 'appearance.sidebar-hide-header-new-session',
+    page: 'appearance',
+    titleKey: 'settings.openchamber.sidebar.field.hideHeaderNewSession',
+    descriptionKey: 'settings.openchamber.sidebar.field.hideHeaderNewSessionHint',
+    keywords: ['sidebar', 'header', 'new session', 'hide', 'button'],
+    isAvailable: (ctx) => !ctx.isVSCode,
+  },
+  {
+    id: 'appearance.sidebar-actions-always-visible',
+    page: 'appearance',
+    titleKey: 'settings.openchamber.sidebar.field.actionsAlwaysVisible',
+    descriptionKey: 'settings.openchamber.sidebar.field.actionsAlwaysVisibleHint',
+    keywords: ['sidebar', 'icons', 'actions', 'always', 'visible', 'hover', 'reveal', 'muted'],
+    isAvailable: (ctx) => !ctx.isVSCode,
+  },
+  {
     id: 'git.identities',
     page: 'git',
     titleKey: 'settings.gitIdentities.page.section.title',

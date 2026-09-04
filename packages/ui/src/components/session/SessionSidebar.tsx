@@ -130,6 +130,8 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
   const setWorktreesPageProjectId = useUIStore((state) => state.setWorktreesPageProjectId);
   const openMultiRunLauncher = useUIStore((state) => state.openMultiRunLauncher);
   const notifyOnSubtasks = useUIStore((state) => state.notifyOnSubtasks);
+  const sidebarKeepOpen = useUIStore((state) => state.sidebarKeepOpen);
+  const sidebarHideHeaderNewSession = useUIStore((state) => state.sidebarHideHeaderNewSession);
 
   const debouncedSessionSearchQuery = useDebouncedValue(sessionSearchQuery, 120);
   const normalizedSessionSearchQuery = React.useMemo(
@@ -172,7 +174,10 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
     if (isVSCode) {
       window.dispatchEvent(new CustomEvent('openchamber:navigate', { detail: { view: 'chat' } }));
     }
-  }, [isVSCode, openNewSessionDraft]);
+    if (sidebarKeepOpen === false && !isVSCode) {
+      useUIStore.getState().setSidebarOpen(false);
+    }
+  }, [isVSCode, openNewSessionDraft, sidebarKeepOpen]);
   const updateStore = useUpdateStore(useShallow((s) => ({
     checkForUpdates: s.checkForUpdates,
     available: s.available,
@@ -589,7 +594,10 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
       setSessionSwitcherOpen(false);
     }
     openNewSessionDraft();
-  }, [mobileVariant, openNewSessionDraft, setSessionSwitcherOpen]);
+    if (sidebarKeepOpen === false && !isVSCode) {
+      useUIStore.getState().setSidebarOpen(false);
+    }
+  }, [mobileVariant, openNewSessionDraft, setSessionSwitcherOpen, sidebarKeepOpen, isVSCode]);
 
   return (
     // One shared tooltip provider for the whole sidebar, matching the opencode
@@ -605,7 +613,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
         mobileVariant ? '' : 'bg-transparent',
       )}
     >
-      {!hideDirectoryControls && !isVSCode ? (
+      {!hideDirectoryControls && !isVSCode && (!sidebarHideHeaderNewSession || projects.length === 0) ? (
         <SidebarNav onNewSession={handleOpenNewSessionDraftFromHeader} />
       ) : null}
 
@@ -613,6 +621,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
         hideDirectoryControls={hideDirectoryControls}
         showProjectDisplayControls={!isVSCode}
         showRecentControls={!isVSCode}
+        showSidebarPin={!mobileVariant && !isVSCode}
         handleOpenDirectoryDialog={handleOpenDirectoryDialog}
         onOpenScheduled={() => {
           if (mobileVariant) setSessionSwitcherOpen(false);
@@ -740,6 +749,9 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
           useUIStore.getState().closeMainSurfaces();
           if (mobileVariant) {
             setSessionSwitcherOpen(false);
+          }
+          if (sidebarKeepOpen === false && !isVSCode) {
+            useUIStore.getState().setSidebarOpen(false);
           }
           if (options?.sessionId) {
             setCurrentSession(options.sessionId, worktreePath);

@@ -1,7 +1,7 @@
 ---
 id: PRD-014
 title: Sidebar close-after-use and hide new-session
-status: draft
+status: done
 created: 2026-09-02
 ---
 

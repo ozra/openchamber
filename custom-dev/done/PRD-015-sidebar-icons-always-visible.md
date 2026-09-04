@@ -1,7 +1,7 @@
 ---
 id: PRD-015
 title: Sidebar project icons always visible
-status: draft
+status: done
 created: 2026-09-02
 related:
   - PRD-012

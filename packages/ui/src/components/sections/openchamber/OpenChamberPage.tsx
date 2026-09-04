@@ -13,6 +13,7 @@ import { OpenCodeCliSettings } from './OpenCodeCliSettings';
 import { OpenChamberToolsSettings } from './OpenChamberToolsSettings';
 import { DesktopNetworkSettings } from './DesktopNetworkSettings';
 import { KeyboardShortcutsSettings } from './KeyboardShortcutsSettings';
+import { SidebarSettings } from './SidebarSettings';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
 import { useDeviceInfo } from '@/lib/device';
 import { isDesktopLocalOriginActive, isDesktopShell, isVSCodeRuntime, isWebRuntime } from '@/lib/desktop';
@@ -164,20 +165,27 @@ const GeneralSectionContent: React.FC = () => {
 // Visual section: Theme Mode, Font Size, Spacing, Input Bar Offset (mobile), Nav Rail
 const VisualSectionContent: React.FC = () => {
     const isVSCode = isVSCodeRuntime();
-    return <OpenChamberVisualSettings visibleSettings={[
-        'theme',
-        'windowControlsPosition',
-        'pwaInstallName',
-        'pwaOrientation',
-        'mobileKeyboardMode',
-        'timeFormat',
-        ...(!isVSCode ? ['weekStart' as const] : []),
-        'fontSize',
-        'terminalFontSize',
-        'editorFontSize',
-        'spacing',
-        'inputBarOffset',
-    ]} />;
+    return (
+        <>
+            <OpenChamberVisualSettings visibleSettings={[
+                'theme',
+                'windowControlsPosition',
+                'pwaInstallName',
+                'pwaOrientation',
+                'mobileKeyboardMode',
+                'timeFormat',
+                ...(!isVSCode ? ['weekStart' as const] : []),
+                'fontSize',
+                'terminalFontSize',
+                'editorFontSize',
+                'spacing',
+                'inputBarOffset',
+            ]} />
+            {/* Fork sidebar chrome preferences (PRD-014/015): the keep-open
+                pin lives in the sidebar itself; these are set-once toggles. */}
+            {!isVSCode ? <SidebarSettings /> : null}
+        </>
+    );
 };
 
 // Chat section: User message rendering, Diff layout, Mobile status bar, Show reasoning traces, Follow-up behavior, Persist draft

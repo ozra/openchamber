@@ -3,6 +3,8 @@ import { cn } from '@/lib/utils';
 import type { SessionNode } from '../types';
 import { useI18n } from '@/lib/i18n';
 import { useSessionDisplayStore } from '@/stores/useSessionDisplayStore';
+import { useUIStore } from '@/stores/useUIStore';
+import { useProjectsStore } from '@/stores/useProjectsStore';
 import { Icon } from "@/components/icon/Icon";
 import {
   collectSubtreeContainingId,
@@ -101,6 +103,17 @@ export function SidebarActivitySections(props: Props): React.ReactNode {
   const { t } = useI18n();
   const { pinnedSessionIds } = props;
   const stickyZoneHeaders = useSessionDisplayStore((state) => state.stickyZoneHeaders);
+  // PRD-014: hiding the global "New session" button also hides the sibling
+  // "+" in the Chats section heading — both are the same always-visible
+  // global entry point. The fallback keeps creation reachable when no
+  // projects are present (per-project creation would be unreachable).
+  const sidebarHideHeaderNewSession = useUIStore((state) => state.sidebarHideHeaderNewSession);
+  const projectCount = useProjectsStore((state) => state.projects.length);
+  const showChatsNewChat = !sidebarHideHeaderNewSession || projectCount === 0;
+  // PRD-015: the fork setting keeps the Chats-section "+" visible at rest
+  // (muted) instead of hover-revealing it.
+  const sidebarActionsAlwaysVisible = useUIStore((state) => state.sidebarActionsAlwaysVisible);
+  const chatsNewChatVisibleAtRest = props.alwaysShowActions || sidebarActionsAlwaysVisible;
   const [collapsed, setCollapsed] = React.useState<Set<string>>(new Set());
   const [visibleCountBySection, setVisibleCountBySection] = React.useState<Map<string, number>>(new Map());
   const flatVariant = variant === 'flat';
@@ -266,11 +279,11 @@ export function SidebarActivitySections(props: Props): React.ReactNode {
                 </span>
                 <span className="text-[14px] font-semibold lowercase text-foreground">{section.title}</span>
               </button>
-              {section.key === 'chats' && props.onNewChat ? (
+              {section.key === 'chats' && props.onNewChat && showChatsNewChat ? (
                 <button
                   type="button"
                   onClick={(event) => { event.stopPropagation(); props.onNewChat?.(); }}
-                  className={cn('absolute right-0.5 top-1/2 z-10 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50', props.alwaysShowActions ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover/chats:opacity-100 group-hover/chats:pointer-events-auto group-focus-within/chats:opacity-100 group-focus-within/chats:pointer-events-auto')}
+                  className={cn('absolute right-0.5 top-1/2 z-10 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50', chatsNewChatVisibleAtRest ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover/chats:opacity-100 group-hover/chats:pointer-events-auto group-focus-within/chats:opacity-100 group-focus-within/chats:pointer-events-auto')}
                   aria-label={t('sessions.sidebar.header.actions.newSession')}
                 >
                   <Icon name="add" className="h-4 w-4" />

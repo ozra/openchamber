@@ -13,6 +13,7 @@ import { Icon } from "@/components/icon/Icon";
 import { ArrowsMerge } from '@/components/icons/ArrowsMerge';
 import { useSessionDisplayStore } from '@/stores/useSessionDisplayStore';
 import { useSessionMultiSelectStore } from '@/stores/useSessionMultiSelectStore';
+import { useUIStore } from '@/stores/useUIStore';
 import { useI18n } from '@/lib/i18n';
 import { updateDesktopSettings } from '@/lib/persistence';
 
@@ -20,6 +21,8 @@ type Props = {
   hideDirectoryControls: boolean;
   showProjectDisplayControls: boolean;
   showRecentControls: boolean;
+  /** Desktop left sidebar only: shows the pin that toggles keep-open vs auto-close. */
+  showSidebarPin?: boolean;
   handleOpenDirectoryDialog: () => void;
   onOpenScheduled: () => void;
   onOpenMultiRun: () => void;
@@ -44,6 +47,7 @@ export function SidebarHeader(props: Props): React.ReactNode {
     hideDirectoryControls,
     showProjectDisplayControls,
     showRecentControls,
+    showSidebarPin = false,
     handleOpenDirectoryDialog,
     onOpenScheduled,
     onOpenMultiRun,
@@ -76,6 +80,17 @@ export function SidebarHeader(props: Props): React.ReactNode {
   const projectDisplayMode = useSessionDisplayStore((state) => state.projectDisplayMode);
   const setProjectDisplayMode = useSessionDisplayStore((state) => state.setProjectDisplayMode);
   const isSingleProjectMode = showProjectDisplayControls && projectDisplayMode === 'single';
+
+  // PRD-014: pin in the sidebar toolbar toggles keep-open (sticky) vs
+  // auto-close after selecting or starting a session. Shown only on the
+  // desktop/web left sidebar that can actually open and close.
+  const sidebarKeepOpen = useUIStore((state) => state.sidebarKeepOpen);
+  const setSidebarKeepOpen = useUIStore((state) => state.setSidebarKeepOpen);
+  const handleToggleSidebarKeepOpen = React.useCallback(() => {
+    const next = !useUIStore.getState().sidebarKeepOpen;
+    setSidebarKeepOpen(next);
+    void updateDesktopSettings({ sidebarKeepOpen: next });
+  }, [setSidebarKeepOpen]);
 
   if (hideDirectoryControls) {
     return null;
@@ -149,6 +164,33 @@ export function SidebarHeader(props: Props): React.ReactNode {
           </div>
 
           <div className="flex items-center gap-1.5">
+            {showSidebarPin ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleToggleSidebarKeepOpen}
+                    className={cn(
+                      headerActionButtonClass,
+                      'text-muted-foreground hover:text-foreground hover:bg-transparent',
+                      sidebarKeepOpen && 'text-primary',
+                    )}
+                    aria-label={sidebarKeepOpen
+                      ? t('sessions.sidebar.header.actions.keepSidebarOpen')
+                      : t('sessions.sidebar.header.actions.autoCloseSidebar')}
+                    aria-pressed={sidebarKeepOpen}
+                  >
+                    <Icon name={sidebarKeepOpen ? 'pushpin-2-fill' : 'unpin'} className={headerActionIconClass} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={4}>
+                  <p>{sidebarKeepOpen
+                    ? t('sessions.sidebar.header.actions.keepSidebarOpen')
+                    : t('sessions.sidebar.header.actions.autoCloseSidebar')}</p>
+                </TooltipContent>
+              </Tooltip>
+            ) : null}
+
             <Tooltip>
               <TooltipTrigger asChild>
                 <button

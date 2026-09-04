@@ -247,6 +247,8 @@ export const dict: Record<I18nKey, string> = {
   'sessions.sidebar.header.actions.closeSessions': '關閉會話',
   'sessions.sidebar.header.actions.addProject': '新增專案',
   'sessions.sidebar.header.actions.newSession': '新增會話',
+  'sessions.sidebar.header.actions.keepSidebarOpen': '保持側邊欄開啟',
+  'sessions.sidebar.header.actions.autoCloseSidebar': '選取或建立工作階段後自動關閉側邊欄',
   'sessions.sidebar.header.actions.newMultiRun': '新增 Multi-run',
   'sessions.sidebar.header.actions.scheduledTasks': '排程任務',
   'sessions.scheduledTasks.dialog.title': '排程任務',

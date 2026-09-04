@@ -877,6 +877,12 @@ interface UIStore {
   inputSpellcheckEnabled: boolean;
   /** Arrow keys walk previous prompt history in the composer (default off). */
   arrowKeyPromptHistoryEnabled: boolean;
+  /** Sidebar stays open after selecting or starting a session (PRD-014 pin). */
+  sidebarKeepOpen: boolean;
+  /** Hide the sidebar header "New session" button (PRD-014). */
+  sidebarHideHeaderNewSession: boolean;
+  /** Always show project/group icons at rest instead of hover-revealing (PRD-015). */
+  sidebarActionsAlwaysVisible: boolean;
   largeTextPasteBehavior: LargeTextPasteBehavior;
   wideChatLayoutEnabled: boolean;
   codeBlockLineWrap: boolean;
@@ -1060,6 +1066,9 @@ interface UIStore {
   setProjectContextTab: (value: string) => void;
   setInputSpellcheckEnabled: (value: boolean) => void;
   setArrowKeyPromptHistoryEnabled: (value: boolean) => void;
+  setSidebarKeepOpen: (value: boolean) => void;
+  setSidebarHideHeaderNewSession: (value: boolean) => void;
+  setSidebarActionsAlwaysVisible: (value: boolean) => void;
   setLargeTextPasteBehavior: (value: LargeTextPasteBehavior) => void;
   setWideChatLayoutEnabled: (value: boolean) => void;
   setCodeBlockLineWrap: (value: boolean) => void;
@@ -1229,6 +1238,9 @@ export const useUIStore = create<UIStore>()(
         projectContextTab: 'notes',
         inputSpellcheckEnabled: false,
         arrowKeyPromptHistoryEnabled: false,
+        sidebarKeepOpen: true,
+        sidebarHideHeaderNewSession: false,
+        sidebarActionsAlwaysVisible: false,
         largeTextPasteBehavior: DEFAULT_LARGE_TEXT_PASTE_BEHAVIOR,
         wideChatLayoutEnabled: false,
         codeBlockLineWrap: true,
@@ -2487,6 +2499,15 @@ export const useUIStore = create<UIStore>()(
         setArrowKeyPromptHistoryEnabled: (value) => {
           set({ arrowKeyPromptHistoryEnabled: value });
         },
+        setSidebarKeepOpen: (value) => {
+          set({ sidebarKeepOpen: value });
+        },
+        setSidebarHideHeaderNewSession: (value) => {
+          set({ sidebarHideHeaderNewSession: value });
+        },
+        setSidebarActionsAlwaysVisible: (value) => {
+          set({ sidebarActionsAlwaysVisible: value });
+        },
         setLargeTextPasteBehavior: (value) => {
           set({ largeTextPasteBehavior: normalizeLargeTextPasteBehavior(value) });
         },
@@ -2906,6 +2927,9 @@ export const useUIStore = create<UIStore>()(
           projectContextSidebarWidth: state.projectContextSidebarWidth,
           inputSpellcheckEnabled: state.inputSpellcheckEnabled,
           arrowKeyPromptHistoryEnabled: state.arrowKeyPromptHistoryEnabled,
+          sidebarKeepOpen: state.sidebarKeepOpen,
+          sidebarHideHeaderNewSession: state.sidebarHideHeaderNewSession,
+          sidebarActionsAlwaysVisible: state.sidebarActionsAlwaysVisible,
           largeTextPasteBehavior: state.largeTextPasteBehavior,
           wideChatLayoutEnabled: state.wideChatLayoutEnabled,
           codeBlockLineWrap: state.codeBlockLineWrap,

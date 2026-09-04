@@ -17,6 +17,7 @@ import {
   type SwitcherItem,
 } from '@/components/session/sidebar/shell/useSwitcherItems';
 import { useUIStore } from '@/stores/useUIStore';
+import { useProjectsStore } from '@/stores/useProjectsStore';
 import { resolveGlobalSessionDirectory } from '@/stores/useGlobalSessionsStore';
 import { formatSessionCompactDateLabel } from './sidebar/utils';
 import type { SessionNode } from './sidebar/types';
@@ -79,6 +80,12 @@ function SwitcherContent({ onSelect, variant, scopeProjectId }: SwitcherContentP
   const items = useSwitcherItems(true, { scopeProjectId, currentSessionId });
   const openNewSessionDraft = useSessionUIStore((state) => state.openNewSessionDraft);
   const { t } = useI18n();
+  // PRD-014: hiding the global "New session" button also removes this
+  // dropdown's sibling item. The fallback keeps it reachable when no
+  // projects are present.
+  const sidebarHideHeaderNewSession = useUIStore((state) => state.sidebarHideHeaderNewSession);
+  const projectCount = useProjectsStore((state) => state.projects.length);
+  const showHeaderNewSession = !sidebarHideHeaderNewSession || projectCount === 0;
 
   const handleNewSession = React.useCallback(() => {
     onSelect();
@@ -129,6 +136,7 @@ function SwitcherContent({ onSelect, variant, scopeProjectId }: SwitcherContentP
   return (
     <div ref={contentRef} className="max-h-[60vh] overflow-y-auto">
       <div className="space-y-0.5">
+        {showHeaderNewSession ? (
         <BaseMenu.Item
           data-switcher-item-id={NEW_SESSION_SWITCHER_TARGET}
           onClick={handleNewSession}
@@ -142,6 +150,7 @@ function SwitcherContent({ onSelect, variant, scopeProjectId }: SwitcherContentP
             {t('sessions.sidebar.header.actions.newSession')}
           </span>
         </BaseMenu.Item>
+        ) : null}
         {items.length === 0 ? (
           <div className="px-3 py-4 text-center typography-meta text-muted-foreground">
             {t('sessions.switcher.empty')}

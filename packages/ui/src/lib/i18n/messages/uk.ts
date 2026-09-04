@@ -234,6 +234,8 @@ export const dict: Record<I18nKey, string> = {
   "sessions.sidebar.header.actions.closeSessions": "Закрити сесії",
   "sessions.sidebar.header.actions.addProject": "Додати проєкт",
   "sessions.sidebar.header.actions.newSession": "Нова сесія",
+  "sessions.sidebar.header.actions.keepSidebarOpen": "Тримати бічну панель відкритою",
+  "sessions.sidebar.header.actions.autoCloseSidebar": "Автоматично закривати бічну панель після вибору або початку сеансу",
   "sessions.sidebar.header.actions.newMultiRun": "Новий Multi-run",
   "sessions.sidebar.header.actions.scheduledTasks": "Заплановані завдання",
   "sessions.scheduledTasks.dialog.title": "Заплановані завдання",

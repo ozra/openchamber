@@ -234,6 +234,8 @@ export const dict: Record<I18nKey, string> = {
   'sessions.sidebar.header.actions.closeSessions': '关闭会话',
   'sessions.sidebar.header.actions.addProject': '添加项目',
   'sessions.sidebar.header.actions.newSession': '新建会话',
+  'sessions.sidebar.header.actions.keepSidebarOpen': '保持侧边栏打开',
+  'sessions.sidebar.header.actions.autoCloseSidebar': '选择或创建会话后自动关闭侧边栏',
   'sessions.sidebar.header.actions.newMultiRun': '新建多运行',
   'sessions.sidebar.header.actions.scheduledTasks': '计划任务',
   'sessions.scheduledTasks.dialog.title': '计划任务',
