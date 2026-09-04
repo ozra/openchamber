@@ -1,6 +1,9 @@
 # Agent memory
 .graymatter/
 
+# %TEMP% literal path opencode writes session state into
+%TEMP%/
+
 # Logs
 logs
 *.log
