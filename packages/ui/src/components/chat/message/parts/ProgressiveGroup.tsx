@@ -13,7 +13,7 @@ import { Text } from '@/components/ui/text';
 import { Icon } from "@/components/icon/Icon";
 import { FadeInOnReveal } from '../FadeInOnReveal';
 import { getToolIcon } from './toolPresentation';
-import { getToolMetadata } from '@/lib/toolHelpers';
+import { getToolLabelColorVar, getToolMetadata } from '@/lib/toolHelpers';
 import { isExpandableTool, isStandaloneTool, isStaticTool } from './toolRenderUtils';
 import { RuntimeAPIContext } from '@/contexts/runtimeAPIContext';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
@@ -686,7 +686,7 @@ const StaticToolRowInner: React.FC<{
                 active={hasRunningActivity}
                 minDurationMs={1000}
                 className={cn(TOOL_ROW_TITLE_CLASS, 'inline-flex items-center flex-shrink-0 opacity-85')}
-                style={{ color: 'var(--tools-title)' }}
+                style={{ color: getToolLabelColorVar(toolName) }}
                 title={displayName}
             >
                 {displayName}

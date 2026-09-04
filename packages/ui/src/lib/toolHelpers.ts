@@ -1,3 +1,27 @@
+/**
+ * Convert a tool name to a stable CSS/theme label key (e.g. `apply_patch` →
+ * `apply-patch`, `npm.read` → `read`). Used as the single color source for
+ * message-prefix labels: `--tools-label-<key>` and `tools.labels.<key>`.
+ */
+export function normalizeToolLabelKey(toolName: string): string {
+  const trimmed = toolName.trim().toLowerCase();
+  if (!trimmed) return '';
+
+  let key = trimmed.replace(/:\d+$/, '');
+
+  // Strip namespace prefix (e.g. "npm.read" → "read").
+  const dotParts = key.split('.').filter(Boolean);
+  if (dotParts.length > 1) key = dotParts[dotParts.length - 1] ?? key;
+
+  return key.replace(/_+/g, '-');
+}
+
+/** CSS var referencing a tool's prefix label color, falling back to the generic tool title. */
+export function getToolLabelColorVar(toolName: string): string {
+  const key = normalizeToolLabelKey(toolName);
+  return key ? `var(--tools-label-${key}, var(--tools-title))` : 'var(--tools-title)';
+}
+
 export interface ToolMetadata {
   displayName: string;
   icon?: string;

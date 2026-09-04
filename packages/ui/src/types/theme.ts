@@ -131,6 +131,8 @@ export interface Theme {
       edit?: Record<string, string>;
       bash?: Record<string, string>;
       lsp?: Record<string, string>;
+      /** Optional per-tool prefix label colors, keyed by normalized tool name (see normalizeToolLabelKey). */
+      labels?: Record<string, string>;
     };
     forms?: Record<string, string>;
     buttons?: {

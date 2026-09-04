@@ -1,7 +1,7 @@
 ---
 id: PRD-011
 title: Tool prefix tag colors
-status: ready
+status: done
 created: 2026-09-02
 depends_on: []
 deliver_with:

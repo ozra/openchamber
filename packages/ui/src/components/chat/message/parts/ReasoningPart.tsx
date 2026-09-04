@@ -329,21 +329,21 @@ export const ReasoningTimelineBlock: React.FC<ReasoningTimelineBlockProps> = ({
                     </div>
 
                     {isStreaming ? (
-                        <span className={cn('flex items-center gap-1', TOOL_ROW_TITLE_CLASS)} style={{ color: 'var(--tools-title)' }}>
+                        <span className={cn('flex items-center gap-1', TOOL_ROW_TITLE_CLASS)} style={{ color: 'var(--tools-label-thinking, var(--tools-title))' }}>
                             <span>{t(variant === 'justification' ? 'chat.reasoningTrace.justification' : 'chat.reasoningTrace.thinking')}</span>
                             <BusyDots />
                         </span>
                     ) : isExpanded ? (
                         <span
                             className={TOOL_ROW_TITLE_CLASS}
-                            style={{ color: 'var(--tools-title)' }}
+                            style={{ color: 'var(--tools-label-thinking, var(--tools-title))' }}
                         >
                             {t(variant === 'justification' ? 'chat.reasoningTrace.justification' : 'chat.reasoningTrace.thinking')}
                         </span>
                     ) : (
                         <span
                             className={TOOL_ROW_TITLE_CLASS}
-                            style={{ color: 'var(--tools-title)' }}
+                            style={{ color: 'var(--tools-label-thinking, var(--tools-title))' }}
                         >
                             {t(variant === 'justification' ? 'chat.reasoningTrace.justification' : 'chat.reasoningTrace.thinking')}
                         </span>

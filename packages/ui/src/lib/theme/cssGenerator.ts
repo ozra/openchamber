@@ -1,6 +1,7 @@
 import type { Theme } from '@/types/theme';
 import { SEMANTIC_TYPOGRAPHY, VSCODE_TYPOGRAPHY } from '@/lib/typography';
 import { isVSCodeRuntime } from '@/lib/desktop';
+import { normalizeToolLabelKey } from '@/lib/toolHelpers';
 
 const hexToRgb = (value: string | undefined | null): string | null => {
   if (!value || typeof value !== 'string') {
@@ -455,6 +456,17 @@ const sidebarBaseRgb = hexToRgb(theme.colors.surface.muted);
     vars.push(`  --tools-icon: ${tools?.icon || theme.colors.surface.mutedForeground};`);
     vars.push(`  --tools-title: ${tools?.title || theme.colors.surface.foreground};`);
     vars.push(`  --tools-description: ${tools?.description || this.opacity(theme.colors.surface.mutedForeground, 0.6)};`);
+
+    // Per-tool prefix label colors (PRD-011). Emit only the tools the theme defines.
+
+    if (tools?.labels) {
+      for (const [key, value] of Object.entries(tools.labels)) {
+        const labelKey = normalizeToolLabelKey(key);
+        if (labelKey) {
+          vars.push(`  --tools-label-${labelKey}: ${value};`);
+        }
+      }
+    }
 
     if (tools?.edit) {
       vars.push(`  --tools-edit-added: ${tools.edit.added || theme.colors.status.success};`);

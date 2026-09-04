@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { SimpleMarkdownRenderer } from '../../MarkdownRenderer';
 import { QuestionMarkdown } from '../../QuestionMarkdown';
 import { MessageFilesDisplay } from '../../FileAttachment';
-import { getToolMetadata } from '@/lib/toolHelpers';
+import { getToolLabelColorVar, getToolMetadata } from '@/lib/toolHelpers';
 import type { ToolPart as ToolPartType, ToolState as ToolStateUnion, FilePart } from '@opencode-ai/sdk/v2';
 import { toolDisplayStyles } from '@/lib/typography';
 import { WorkerHighlightedCode } from '@/components/code/WorkerHighlightedCode';
@@ -898,7 +898,7 @@ const TaskSummaryEntryRow = React.memo(({
                 <span className="flex-shrink-0 text-foreground/80">{getToolIcon(toolName)}</span>
                 <span
                     className="typography-meta text-foreground/80 flex-shrink-0"
-                    style={{ color: 'var(--tools-title)' }}
+                    style={{ color: getToolLabelColorVar(toolName) }}
                     title={displayName}
                 >
                     {displayName}
@@ -1117,7 +1117,6 @@ const CODE_TAG_PROPS = { style: { background: 'transparent', backgroundColor: 't
 const TOOL_ERROR_ICON_STYLE: React.CSSProperties = { color: 'var(--status-error)' };
 const TOOL_NORMAL_ICON_STYLE: React.CSSProperties = { color: 'var(--tools-icon)' };
 const TOOL_ERROR_TITLE_STYLE: React.CSSProperties = { color: 'var(--status-error)' };
-const TOOL_NORMAL_TITLE_STYLE: React.CSSProperties = { color: 'var(--tools-title)' };
 
 const renderPathLikeGitChanges = (path: string, grow = true) => {
     const lastSlash = path.lastIndexOf('/');
@@ -2089,7 +2088,7 @@ const ToolPartContent: React.FC<ToolPartProps> = ({
     };
 
     const iconStyle = !isTaskTool && isError ? TOOL_ERROR_ICON_STYLE : TOOL_NORMAL_ICON_STYLE;
-    const titleStyle = !isTaskTool && isError ? TOOL_ERROR_TITLE_STYLE : TOOL_NORMAL_TITLE_STYLE;
+    const titleStyle = !isTaskTool && isError ? TOOL_ERROR_TITLE_STYLE : { color: getToolLabelColorVar(normalizedPartTool || part.tool) };
     const shouldRenderTaskSummary = useDeferredExpandedContent(isTaskTool && (taskSummaryEntries.length > 0 || isActive || shouldTreatAsFinalized || !!taskSessionId));
     const shouldRenderExpandedContent = useDeferredExpandedContent(!isTaskTool && isExpanded);
 

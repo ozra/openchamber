@@ -213,6 +213,21 @@ OpenChamber supports user-defined themes. Drop a JSON file into the themes direc
 
 - `colors.surface.muted` and `colors.surface.elevated` must always use 90 alpha (`...90` in 8-digit hex, e.g. `#1C1B1A90`).
 
+## Tool label colors
+
+Give a tool's prefix label its own color with `colors.tools.labels`. Keys are normalized tool names, with underscores replaced by hyphens, so `apply_patch` becomes `apply-patch`. A missing key falls back to `colors.tools.title`. The special key `thinking` colors the Thinking and Justification headers. You only need the tools you want to distinguish.
+
+```json
+"tools": {
+  "labels": {
+    "bash": "#F92672",
+    "apply-patch": "#F92672",
+    "read": "#A6E22E",
+    "thinking": "#CECDC3"
+  }
+}
+```
+
 ## Validation
 
 Themes are validated on load. Invalid themes are skipped with a console warning.
