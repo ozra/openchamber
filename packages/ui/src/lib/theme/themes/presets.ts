@@ -19,6 +19,8 @@ import kanagawa_dark_Raw from './kanagawa-dark.json';
 import kanagawa_light_Raw from './kanagawa-light.json';
 import monokai_dark_Raw from './monokai-dark.json';
 import monokai_light_Raw from './monokai-light.json';
+import monozrakai_dark_Raw from './monozrakai-dark.json';
+import monozrakai_light_Raw from './monozrakai-light.json';
 import nightowl_dark_Raw from './nightowl-dark.json';
 import nightowl_light_Raw from './nightowl-light.json';
 import nord_dark_Raw from './nord-dark.json';
@@ -61,6 +63,8 @@ export const presetThemes: Theme[] = [
   kanagawa_light_Raw as Theme,
   monokai_dark_Raw as Theme,
   monokai_light_Raw as Theme,
+  monozrakai_dark_Raw as Theme,
+  monozrakai_light_Raw as Theme,
   nightowl_dark_Raw as Theme,
   nightowl_light_Raw as Theme,
   nord_dark_Raw as Theme,
