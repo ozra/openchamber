@@ -165,6 +165,13 @@ additive variant or direct shared modification, why, what remains shared, and
 the smallest required core integration. This is a decision rule, not a demand
 to copy every component.
 
+## Cross-cutting note on localization
+
+English is the only supported language for this fork. Give every new or changed
+i18n key proper English text. Keep the key present in every other locale file but use the exact value `TRANSLATE ME` instead of spending
+time on unsupported translations. Proper translations can be done as a separate
+effort later.
+
 ## Adding persisted settings
 
 A shared setting must survive the full round trip. Add its client type, store

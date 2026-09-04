@@ -1,11 +1,15 @@
 ---
 id: PRD-006
 title: Agent modes: read / write / full
-status: draft
+status: closed
 created: 2026-09-01
 ---
 
 # PRD-006 — Agent modes: read / write / full
+
+## Closed
+
+Closed because this has be accomplished through regular opencode confs
 
 ## Goal
 
