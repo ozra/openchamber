@@ -60,16 +60,18 @@ becomes keyboard-unreachable.
 
 ### The setting
 
-New composer setting **Send prompt with**, two options, persisted through the
-normal autosave round trip:
+Upstream shipped this capability independently while the fork's first cut was in
+flight, as the composer toggle **Enter sends** (`enterToSend` plus
+`enterToSendConfigured`), with settings UI, settings search and i18n in every
+locale. The fork uses **that** setting rather than a parallel one — see
+"Relationship to upstream" below. The two positions read:
 
-**`auto` — "Enter sends (original)"**
+**Enter sends *on* — "Enter sends (original)"**
 
-Exactly today's behavior, unchanged on every surface. Enter submits on desktop
-and writes a newline on mobile and in focus mode; Ctrl/Cmd+Enter submits now;
-Shift+Enter is a newline. No new chords.
+Today's desktop behavior. Enter submits, Ctrl/Cmd+Enter submits now, Shift+Enter
+is a newline. No new chords.
 
-**`mod-enter` — "Ctrl+Enter sends, Enter makes a newline"** (**default**)
+**Enter sends *off*** (**the fork default**)
 
 | Key | Action |
 |---|---|
@@ -81,7 +83,39 @@ Shift+Enter is a newline. No new chords.
 Ctrl/Cmd+Enter takes over the role plain Enter had, including its queue/steer
 behavior, and the send-now escalation moves up to Ctrl/Cmd+Shift+Enter so it is
 not lost. This is the one genuinely new chord; it exists only in this option, so
-`auto` stays byte-identical to today.
+"Enter sends" on stays byte-identical to today.
+
+## Relationship to upstream
+
+Upstream's `enterToSend` covers the same ground with a different taste in two
+places, and the fork overrides exactly those two:
+
+| | upstream, Enter sends off | this fork |
+|---|---|---|
+| Shift+Enter | **submits** | newline, always |
+| Ctrl/Cmd+Enter | submits now, bypassing queue/steer | submits, honoring queue/steer |
+| Ctrl/Cmd+Shift+Enter | submits now | submits now |
+| default | unconfigured — the old per-surface heuristic | Enter sends off |
+
+Spending Shift+Enter on "submit" costs the one chord every text editor uses for
+a line break, and leaving Ctrl/Cmd+Enter as the only send makes the queue
+unreachable from the keyboard when `followUpBehavior` is `queue` (its default).
+
+Everything else — the stored keys, the sanitizer, the server allowlist, the
+settings toggle, settings search and all i18n — is upstream's and is *not*
+forked. Reusing it deleted the fork's parallel `composerSendKey` setting and its
+`submit/sendKey.ts` resolver, and shrank this feature's merge surface to three
+edits, all of which carry a `PRD-031 (fork)` comment:
+
+1. `composer/keyboardPolicy.ts` — one expression: Shift+Enter never submits.
+2. `chat/ChatInput.tsx` — the `sendNow` derivation: with Enter-sends off, the
+   send-now escalation is Ctrl/Cmd+**Shift**+Enter, so plain Ctrl/Cmd+Enter
+   falls through to the queue/steer branch.
+3. `stores/useUIStore.ts` — the `enterToSendConfigured: true` default.
+
+Upstream's `keyboardPolicy.test.ts` asserts the behavior the fork overrides; its
+`configured disabled Shift+Enter` case is inverted here and marked. If a future
+catch-up drops these, the symptom is Shift+Enter sending mid-sentence.
 
 ### Invariants in both options
 
@@ -124,54 +158,44 @@ Revisit if the requirement grows beyond these two presets.
 
 ## Component strategy
 
-Direct shared modification. A small setting belongs on the shared path
-(custom-dev README, "Fork customization strategy"), and this replaces one
-boolean expression inside an existing handler. Following PRD-024's precedent in
-the same file, the decision moves into a pure module under `submit/` that maps a
-keydown to an intent (`newline` / `submit` / `submit-now`); `ChatInput` keeps
-only the call and the existing queue/steer branch.
+Direct shared modification, kept as small as it will go. A small setting belongs
+on the shared path (custom-dev README, "Fork customization strategy"), and point
+5 of that strategy — do not make routine upstream merges resolve broad
+fork-specific edits inside the original component — is what settled the shape
+here: adopt upstream's setting whole and override two expressions, rather than
+run a second setting alongside it.
 
 ## Implementation anchors
 
-Mirror the `arrowKeyPromptHistoryEnabled` plumbing (PRD-024) end to end:
+The three fork edits listed under "Relationship to upstream". No new store
+field, no new sanitizer entry, no new server allowlist entry, no new i18n key:
+the setting already exists upstream and already round-trips.
 
-- `stores/useUIStore.ts` — `ComposerSendKey` type, `DEFAULT_COMPOSER_SEND_KEY`,
-  `isComposerSendKey`, `normalizeComposerSendKey`, state field, setter, migrate
-  sanitize, `partialize`.
-- `components/chat/composer/submit/sendKey.ts` — `resolveComposerKeyIntent`
-  plus `__tests__/sendKey.test.ts` covering the full key/option matrix.
-- `components/chat/ChatInput.tsx:1735-1761` — switch on the intent; the
-  queue/steer branch below keeps its shape with `isCtrlEnter` replaced by
-  `intent === 'submit-now'`.
-- `lib/persistence.ts` — defaults snapshot, apply-to-store, sanitize.
-- `lib/api/types.ts`, `lib/desktop.ts` — `composerSendKey?: 'auto' | 'mod-enter'`.
-- `packages/web/server/lib/opencode/settings-helpers.js` (+ `.test.js`) — allowlist.
-- `OpenChamberVisualSettings.tsx` — `SettingsControlGroup` + `SettingsRadioGroup`
-  in the existing Composer section, next to Large text paste; new
-  `VisibleSetting` id `'sendKey'`, listed in `OpenChamberPage.tsx`.
-- `lib/settings/search.ts` — item `chat.send-key`.
-- i18n keys in `en.settings.ts` with real English; `TRANSLATE ME` in the other
-  locale files per the custom-dev localization note.
+Note that upstream's hint text for the toggle still says the setting controls
+Enter *and Shift+Enter*. Under the fork it controls Enter only. The string is
+left alone on purpose — rewording it in thirteen locale files would reintroduce
+the merge surface this design just removed.
 
 ## Acceptance criteria
 
-- `auto` behaves exactly as the current build on desktop, mobile, and in focus
-  mode, including Ctrl/Cmd+Shift+Enter still being a newline there.
-- `mod-enter` (default): Enter writes a newline on desktop; Ctrl/Cmd+Enter
-  submits and honors queue/steer; Ctrl/Cmd+Shift+Enter submits now.
-- Shift+Enter alone writes a newline in both options.
+- Enter sends **on**: Enter submits on desktop, Ctrl/Cmd+Enter submits now,
+  Shift+Enter writes a newline.
+- Enter sends **off** (the default): Enter writes a newline on desktop;
+  Ctrl/Cmd+Enter submits and honors queue/steer; Ctrl/Cmd+Shift+Enter submits
+  now.
+- Shift+Enter alone writes a newline in both positions.
 - The setting survives a restart (client autosave and server `settings.json`)
   and is reachable from settings search.
 - Intentional behavior for web, desktop, VS Code, hosted mobile, and Capacitor
-  mobile — the resolver lives in the shared composer, so all runtimes agree.
+  mobile — the policy lives in the shared composer, so all runtimes agree.
 
 ## Validation
 
-- `bun test packages/ui/src/components/chat/composer/submit/__tests__/sendKey.test.ts`
-- `bun test packages/ui/src/lib/persistence.test.ts` (round trip)
-- `bun test packages/web/server/lib/opencode/settings-helpers.test.js` (sanitizer)
+- `bun test src/components/chat/composer/keyboardPolicy.test.ts` (the key matrix)
+- `bun test src/lib/persistence.test.ts` (round trip)
+- `bun test server/lib/opencode/settings-helpers.test.js` (sanitizer)
 - Manual, per the composer DOCUMENTATION note that keyboard behavior is not
-  covered by tests: both options on desktop, in focus mode, and on mobile,
+  covered by tests: both positions on desktop, in focus mode, and on mobile,
   against a busy session so queue/steer is exercised.
 
 ## Known limitation (pre-existing)

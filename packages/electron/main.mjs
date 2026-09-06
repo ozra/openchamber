@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net as electronNet, Notification, powerMonitor, powerSaveBlocker, protocol, screen, session, shell, webContents } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, MessageChannelMain, nativeTheme, net as electronNet, Notification, powerMonitor, powerSaveBlocker, protocol, screen, session, shell, webContents } from 'electron';
 import contextMenu from 'electron-context-menu';
 import log from 'electron-log/main.js';
 import dgram from 'node:dgram';
@@ -33,9 +33,11 @@ import {
 } from './linux-autostart.mjs';
 import { unsupportedAppSpecificOpenError, validateLocalPath } from './path-open-utils.mjs';
 import { shouldAllowBrowserPanelCertificateError } from './browser-panel-security.mjs';
+import { createRelayDevTunnelBridge } from './relay-dev-tunnel.mjs';
 import { attachRendererRecovery } from './renderer-recovery.mjs';
 import { createPageZoomController } from './page-zoom.mjs';
 import { mintOutsideFileGrant } from '@openchamber/web/server/lib/fs/routes.js';
+import { fetchUpdateNotes } from '@openchamber/web/server/lib/changelog/update-notes.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -235,7 +237,6 @@ const LOCAL_DESKTOP_CLIENT_DEDUPE_KEY = 'desktop-local';
 // connecting to someone else's server).
 const REMOTE_DESKTOP_CLIENT_KIND = 'desktop';
 const ENV_OVERRIDE_HOST_ID = '__env';
-const CHANGELOG_URL = 'https://raw.githubusercontent.com/openchamber/openchamber/main/CHANGELOG.md';
 const GITHUB_BUG_REPORT_URL = 'https://github.com/openchamber/openchamber/issues/new?template=bug_report.yml';
 const GITHUB_FEATURE_REQUEST_URL = 'https://github.com/openchamber/openchamber/issues/new?template=feature_request.yml';
 const DISCORD_INVITE_URL = 'https://discord.gg/ZYRSdnwwKA';
@@ -3201,24 +3202,7 @@ const installDownloadedUpdate = () => new Promise((resolve, reject) => {
   });
 });
 
-const parseRelevantChangelogNotes = async (fromVersion, toVersion) => {
-  try {
-    const response = await fetch(CHANGELOG_URL, { signal: AbortSignal.timeout(10_000) });
-    if (!response.ok) return null;
-    const changelog = await response.text();
-    const sections = changelog.split(/^##\s+\[/m).slice(1);
-    const relevant = [];
-    for (const section of sections) {
-      const version = section.split(']')[0];
-      if (compareSemver(version, fromVersion) > 0 && compareSemver(version, toVersion) <= 0) {
-        relevant.push(`## [${section}`.trim());
-      }
-    }
-    return relevant.length > 0 ? relevant.join('\n\n') : null;
-  } catch {
-    return null;
-  }
-};
+const parseRelevantChangelogNotes = (fromVersion, toVersion) => fetchUpdateNotes(fromVersion, toVersion, compareSemver);
 
 const buildInstalledAppsCachePath = () => path.join(path.dirname(settingsFilePath()), INSTALLED_APPS_CACHE_FILE);
 
@@ -3838,6 +3822,7 @@ const runSpecChain = (specs, appName) => {
 // The tunnel client lives in the web package (it already has a WebSocket
 // client) and is loaded only if the user actually previews a remote dev server.
 let devTunnelClientPromise = null;
+const relayDevTunnelBridge = createRelayDevTunnelBridge({ createMessageChannel: () => new MessageChannelMain(), logger: log });
 const getDevTunnelClient = async () => {
   if (!devTunnelClientPromise) {
     devTunnelClientPromise = import('@openchamber/web/server/lib/dev-tunnel/client.js')
@@ -3851,6 +3836,7 @@ const getDevTunnelClient = async () => {
 };
 
 const closeAllDevTunnels = () => {
+  relayDevTunnelBridge.closeAll();
   if (!devTunnelClientPromise) return;
   const pending = devTunnelClientPromise;
   devTunnelClientPromise = null;
@@ -3967,6 +3953,11 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       if (!baseUrl) throw new Error('baseUrl is required');
       if (!(port > 0 && port <= 65535)) throw new Error('A valid port is required');
 
+      if (args.relay === true) {
+        const targetKey = typeof args.targetKey === 'string' ? args.targetKey.trim() : '';
+        return relayDevTunnelBridge.open({ targetKey, remotePort: port, webContents: browserWindow?.webContents });
+      }
+
       const headers = {};
       const requestHeaders = args.requestHeaders && typeof args.requestHeaders === 'object' ? args.requestHeaders : {};
       for (const [name, value] of Object.entries(requestHeaders)) {
@@ -3988,6 +3979,9 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       const client = await getDevTunnelClient();
       return { closed: client.close({ baseUrl, port }) };
     }
+
+    case 'desktop_relay_dev_tunnel_close_all':
+      return { closed: relayDevTunnelBridge.closeForWebContents(browserWindow?.webContents.id) };
 
     /**
      * Forces prefers-color-scheme for one previewed page.

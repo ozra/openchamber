@@ -212,6 +212,8 @@ const ChatSectionContent: React.FC = () => {
                 'splitAssistantMessageActions',
                 'subagentReadOnlyBanner',
                 'diffLayout',
+                'inputHistoryScope',
+                'inputHistoryLimit',
                 'dotfiles',
                 'fileViewerPreview',
                 'followUpBehavior',
@@ -219,6 +221,7 @@ const ChatSectionContent: React.FC = () => {
                 'arrowKeyHistory',
                 'inputSpellcheck',
                 'largeTextPaste',
+                'enterToSend',
             ]}
         />
     );
