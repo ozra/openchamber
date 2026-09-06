@@ -4,6 +4,7 @@ title: User-originated question answers
 status: draft
 created: 2026-09-03
 related:
+  - PRD-032
   - PRD-001
   - PRD-002
   - PRD-011
