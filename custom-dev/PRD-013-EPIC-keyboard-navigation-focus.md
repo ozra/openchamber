@@ -10,6 +10,8 @@ related:
   - PRD-018
   - PRD-026
   - PRD-029
+  - PRD-031
+  - PRD-032
 ---
 
 # PRD-013 — Keyboard navigation and focus
@@ -30,6 +32,8 @@ related:
 | PRD-018 | Separate stackable Conversation Find view, including configurable contextual Ctrl+F |
 | PRD-026 | Require choosing a project for new sessions — the new-session draft opens its project picker focused with arrow-key navigation (invoke-consistency applies) |
 | PRD-029 | Modifier-held session tab cycling (Ctrl+Tab), committing the selection on modifier release |
+| PRD-031 | Composer send key setting — owns requirement 1 below |
+| PRD-032 | Question tool behaviour cleanup — the non-keyboard half of requirement 2 below |
 | (future) | New keyboard features should register here before being built |
 
 ## Goal
@@ -69,11 +73,11 @@ is identical no matter how the picker is reached.
 
 ## Requirements
 
-1. **Send key setting**
-   - Add a user setting: "Enter to send" (current desktop behavior) vs
-     "require Ctrl+Enter to send".
-   - The setting replaces the `requiresModifierToSend` heuristic and applies in
-     all states (mobile, expanded composer).
+1. **Send key setting** — split out into
+   `PRD-031-composer-send-key-setting.md`, which owns the detail.
+   - A user setting chooses the send key; it replaces the
+     `requiresModifierToSend` heuristic and applies in all states (mobile,
+     expanded composer).
 
 2. **Question tool keyboard operation**
    - The card takes focus when it appears.

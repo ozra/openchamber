@@ -533,6 +533,9 @@ export const createSettingsHelpers = (dependencies) => {
     if (candidate.arrowKeyPromptHistoryEnabled === true || candidate.arrowKeyPromptHistoryEnabled === false) {
       result.arrowKeyPromptHistoryEnabled = candidate.arrowKeyPromptHistoryEnabled;
     }
+    if (candidate.composerSendKey === 'auto' || candidate.composerSendKey === 'mod-enter') {
+      result.composerSendKey = candidate.composerSendKey;
+    }
     if (typeof candidate.showOpenCodeUpdateNotifications === 'boolean') {
       result.showOpenCodeUpdateNotifications = candidate.showOpenCodeUpdateNotifications;
     }

@@ -1,7 +1,7 @@
 import type { DesktopSettings } from '@/lib/desktop';
 import { sanitizeWorkStatusHiddenSections } from '@/components/chat/work-status/sections';
 import { createProjectIdFromPath } from '@/lib/projectId';
-import { useUIStore } from '@/stores/useUIStore';
+import { isComposerSendKey, useUIStore } from '@/stores/useUIStore';
 import { isMonoFontOption, isUiFontOption } from '@/lib/fontOptions';
 import {
   DEFAULT_FOLLOW_UP_BEHAVIOR,
@@ -567,6 +567,7 @@ const materializeAuthoritativeUiSettings = (settings: DesktopSettings): DesktopS
     maxLastMessageLength: defaults.maxLastMessageLength,
     inputSpellcheckEnabled: defaults.inputSpellcheckEnabled,
     arrowKeyPromptHistoryEnabled: defaults.arrowKeyPromptHistoryEnabled,
+    composerSendKey: defaults.composerSendKey,
     sidebarKeepOpen: defaults.sidebarKeepOpen,
     sidebarHideHeaderNewSession: defaults.sidebarHideHeaderNewSession,
     sidebarActionsAlwaysVisible: defaults.sidebarActionsAlwaysVisible,
@@ -742,6 +743,9 @@ const applyDesktopUiPreferences = (settings: DesktopSettings) => {
   }
   if (typeof settings.arrowKeyPromptHistoryEnabled === 'boolean' && settings.arrowKeyPromptHistoryEnabled !== store.arrowKeyPromptHistoryEnabled) {
     store.setArrowKeyPromptHistoryEnabled(settings.arrowKeyPromptHistoryEnabled);
+  }
+  if (isComposerSendKey(settings.composerSendKey) && settings.composerSendKey !== store.composerSendKey) {
+    store.setComposerSendKey(settings.composerSendKey);
   }
   if (typeof settings.sidebarKeepOpen === 'boolean' && settings.sidebarKeepOpen !== store.sidebarKeepOpen) {
     store.setSidebarKeepOpen(settings.sidebarKeepOpen);
@@ -1457,6 +1461,9 @@ const sanitizeWebSettings = (payload: unknown): DesktopSettings | null => {
   }
   if (typeof candidate.arrowKeyPromptHistoryEnabled === 'boolean') {
     result.arrowKeyPromptHistoryEnabled = candidate.arrowKeyPromptHistoryEnabled;
+  }
+  if (isComposerSendKey(candidate.composerSendKey)) {
+    result.composerSendKey = candidate.composerSendKey;
   }
   if (typeof candidate.sidebarKeepOpen === 'boolean') {
     result.sidebarKeepOpen = candidate.sidebarKeepOpen;

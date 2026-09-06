@@ -167,6 +167,8 @@ export type DesktopSettings = {
   inputSpellcheckEnabled?: boolean;
   /** Arrow keys walk previous prompt history in the composer (default off). */
   arrowKeyPromptHistoryEnabled?: boolean;
+  /** Which key sends a prompt from the composer (PRD-031). */
+  composerSendKey?: 'auto' | 'mod-enter';
   showOpenCodeUpdateNotifications?: boolean;
   agentControlToolEnabled?: boolean;
   agentWebToolEnabled?: boolean;

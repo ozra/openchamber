@@ -700,6 +700,7 @@ export interface SettingsPayload {
   gitmojiEnabled?: boolean;
   inputSpellcheckEnabled?: boolean;
   arrowKeyPromptHistoryEnabled?: boolean;
+  composerSendKey?: 'auto' | 'mod-enter';
   showOpenCodeUpdateNotifications?: boolean;
   openCodeUpdateToastDismissedVersion?: string;
   showToolFileIcons?: boolean;

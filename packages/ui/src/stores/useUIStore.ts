@@ -26,8 +26,25 @@ export type DesktopWindowControlsPosition = 'left' | 'right';
 export type DesktopWindowControlsStyle = 'classic' | 'traffic-lights';
 export type FileEditorKeymap = 'default' | 'vim';
 export type LargeTextPasteBehavior = 'ask' | 'attach' | 'inline';
+/**
+ * Which key sends a prompt (PRD-031). `auto` keeps the original heuristic:
+ * Enter sends on desktop, but writes a newline on mobile and in focus mode.
+ * `mod-enter` makes Enter a newline everywhere and moves both submit actions
+ * onto the modifier.
+ */
+export type ComposerSendKey = 'auto' | 'mod-enter';
 
 export const DEFAULT_LARGE_TEXT_PASTE_BEHAVIOR: LargeTextPasteBehavior = 'ask';
+
+export const DEFAULT_COMPOSER_SEND_KEY: ComposerSendKey = 'mod-enter';
+
+export const isComposerSendKey = (value: unknown): value is ComposerSendKey => (
+  value === 'auto' || value === 'mod-enter'
+);
+
+export const normalizeComposerSendKey = (value: unknown): ComposerSendKey => (
+  isComposerSendKey(value) ? value : DEFAULT_COMPOSER_SEND_KEY
+);
 
 export const normalizeLargeTextPasteBehavior = (value: unknown): LargeTextPasteBehavior => {
   if (value === 'attach' || value === 'inline' || value === 'ask') {
@@ -877,6 +894,8 @@ interface UIStore {
   inputSpellcheckEnabled: boolean;
   /** Arrow keys walk previous prompt history in the composer (default off). */
   arrowKeyPromptHistoryEnabled: boolean;
+  /** Which key sends a prompt from the composer (PRD-031). */
+  composerSendKey: ComposerSendKey;
   /** Sidebar stays open after selecting or starting a session (PRD-014 pin). */
   sidebarKeepOpen: boolean;
   /** Hide the sidebar header "New session" button (PRD-014). */
@@ -1066,6 +1085,7 @@ interface UIStore {
   setProjectContextTab: (value: string) => void;
   setInputSpellcheckEnabled: (value: boolean) => void;
   setArrowKeyPromptHistoryEnabled: (value: boolean) => void;
+  setComposerSendKey: (value: ComposerSendKey) => void;
   setSidebarKeepOpen: (value: boolean) => void;
   setSidebarHideHeaderNewSession: (value: boolean) => void;
   setSidebarActionsAlwaysVisible: (value: boolean) => void;
@@ -1238,6 +1258,7 @@ export const useUIStore = create<UIStore>()(
         projectContextTab: 'notes',
         inputSpellcheckEnabled: false,
         arrowKeyPromptHistoryEnabled: false,
+        composerSendKey: DEFAULT_COMPOSER_SEND_KEY,
         sidebarKeepOpen: true,
         sidebarHideHeaderNewSession: false,
         sidebarActionsAlwaysVisible: false,
@@ -2499,6 +2520,9 @@ export const useUIStore = create<UIStore>()(
         setArrowKeyPromptHistoryEnabled: (value) => {
           set({ arrowKeyPromptHistoryEnabled: value });
         },
+        setComposerSendKey: (value) => {
+          set({ composerSendKey: normalizeComposerSendKey(value) });
+        },
         setSidebarKeepOpen: (value) => {
           set({ sidebarKeepOpen: value });
         },
@@ -2825,6 +2849,7 @@ export const useUIStore = create<UIStore>()(
 
           state.fileEditorKeymap = normalizeFileEditorKeymap(state.fileEditorKeymap);
           state.largeTextPasteBehavior = normalizeLargeTextPasteBehavior(state.largeTextPasteBehavior);
+          state.composerSendKey = normalizeComposerSendKey(state.composerSendKey);
 
           if (typeof state.autoSaveEnabled !== 'boolean') {
             state.autoSaveEnabled = true;
@@ -2927,6 +2952,7 @@ export const useUIStore = create<UIStore>()(
           projectContextSidebarWidth: state.projectContextSidebarWidth,
           inputSpellcheckEnabled: state.inputSpellcheckEnabled,
           arrowKeyPromptHistoryEnabled: state.arrowKeyPromptHistoryEnabled,
+          composerSendKey: state.composerSendKey,
           sidebarKeepOpen: state.sidebarKeepOpen,
           sidebarHideHeaderNewSession: state.sidebarHideHeaderNewSession,
           sidebarActionsAlwaysVisible: state.sidebarActionsAlwaysVisible,

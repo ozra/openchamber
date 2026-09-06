@@ -139,6 +139,7 @@ import {
     toServerFileUrl,
 } from './composer/attachments/filePaths';
 import { buildOutgoingMessage } from './composer/submit/buildOutgoingMessage';
+import { resolveComposerKeyIntent } from './composer/submit/sendKey';
 import {
     buildCommandVariables,
     canRunCommand,
@@ -432,6 +433,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const persistChatDraft = useUIStore((state) => state.persistChatDraft);
     const inputSpellcheckEnabled = useUIStore((state) => state.inputSpellcheckEnabled);
     const arrowKeyPromptHistoryEnabled = useUIStore((state) => state.arrowKeyPromptHistoryEnabled);
+    const composerSendKey = useUIStore((state) => state.composerSendKey);
     const largeTextPasteBehavior = useUIStore((state) => state.largeTextPasteBehavior);
     const isExpandedInput = useUIStore((state) => state.isExpandedInput);
     const setExpandedInput = useUIStore((state) => state.setExpandedInput);
@@ -1730,29 +1732,28 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             return;
         }
 
-        // Handle Enter/Ctrl+Enter based on selected follow-up behavior. On
-        // mobile, and in desktop focus mode, plain Enter writes a newline and
-        // only Cmd/Ctrl+Enter sends: both are surfaces for composing long
-        // prompts, where an accidental send costs more than an extra keypress.
-        const requiresModifierToSend = isMobile || isDesktopExpanded;
-        if (e.key === 'Enter' && !e.shiftKey && (!requiresModifierToSend || e.ctrlKey || e.metaKey)) {
+        // Which key submits is the user's choice (PRD-031); `composerSendKey`
+        // owns that decision. What submitting then does — send, queue or steer
+        // — is the follow-up behavior below.
+        const sendIntent = resolveComposerKeyIntent(e, composerSendKey, { isMobile, isDesktopExpanded });
+        if (sendIntent === 'submit' || sendIntent === 'submit-now') {
             e.preventDefault();
 
-            const isCtrlEnter = e.ctrlKey || e.metaKey;
+            const sendNow = sendIntent === 'submit-now';
 
             // Queueing / steering only works when there's an existing busy
             // session (or an active auto-review run).
             const canQueue = !isBtwActive && inputMode === 'normal' && hasContent && currentSessionId && (currentSessionPhase !== 'idle' || autoReviewRunning);
 
             if (followUpBehavior === 'queue') {
-                if (isCtrlEnter || !canQueue) {
+                if (sendNow || !canQueue) {
                     handleSubmit();
                 } else {
                     handleQueueMessage();
                 }
             } else {
-                // steer: Enter steers into the running turn, Ctrl+Enter sends now.
-                if (isCtrlEnter || !canQueue) {
+                // steer: submitting steers into the running turn; send-now sends.
+                if (sendNow || !canQueue) {
                     handleSubmit();
                 } else {
                     handleSubmit({ delivery: 'steer' });
