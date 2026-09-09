@@ -179,6 +179,7 @@ const VisualSectionContent: React.FC = () => {
                 'terminalFontSize',
                 'editorFontSize',
                 'spacing',
+                'scrollbars',
                 'inputBarOffset',
             ]} />
             {/* Fork sidebar chrome preferences (PRD-014/015): the keep-open
