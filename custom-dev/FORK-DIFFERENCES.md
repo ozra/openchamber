@@ -8,12 +8,12 @@ Last verified 2026-09-09 against upstream/main at c498beaa6.
 
 ## Upstream position
 
-- Fork base: the last upstream main merged into this fork is 2dfd1190e
-  ("feat(work-status): add opt-in turn statistics (#3177)", v1.22.2 era).
-- Upstream/main has moved on since. This fork's main carries 28 commits
-  upstream does not (`git log upstream/main..HEAD`); the net code change
-  against the base is 93 files, roughly +2,400 / -220 lines
-  (`git diff 2dfd1190e HEAD -- ':!custom-dev'`).
+- Fork base: the last upstream main merged into this fork is c498beaa6
+  ("fix(small-model): use selected runtime model endpoint (#3437)").
+- This fork's main carries 35 commits upstream does not
+  (`git log upstream/main..HEAD`); the net code change against the base is 94
+  files, +2,410 / -198 lines
+  (`git diff upstream/main HEAD -- ':!custom-dev'`).
 - The work-status turn statistics from #3177 sit in both trees and are not a
   fork difference.
 
@@ -23,8 +23,8 @@ Last verified 2026-09-09 against upstream/main at c498beaa6.
 
 Two new presets, `monozrakai-dark` and `monozrakai-light`, registered in
 `packages/ui/src/lib/theme/themes/presets.ts`, documented in
-`docs/CUSTOM_THEMES.md`. The uncommitted worktree edit to `monozrakai-dark.json`
-(surface background `#27251E` to `#17150E`) is an in-flight theme tweak.
+`docs/CUSTOM_THEMES.md`. The dark preset uses the deeper `#17150E` surface
+background.
 
 ### 2. Per-tool prefix label colors (PRD-011, done)
 
@@ -106,7 +106,7 @@ of pinning it to 1; the shortcuts schema gained plus/minus key tokens and an
 Regenerate the raw lists after each upstream merge with:
 
 - `git log --oneline upstream/main..HEAD`
-- `git diff --stat 2dfd1190e HEAD -- ':!custom-dev'`
+- `git diff --stat upstream/main HEAD -- ':!custom-dev'`
 
 Update the upstream position line to the new merge base and refresh the
 verification date.
