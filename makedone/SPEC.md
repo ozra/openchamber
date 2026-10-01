@@ -1,4 +1,4 @@
-<!-- makedone-spec version=1 sha256=c1000269b091e8f02abaafd9064a585c02547ec1c5b1de14daa7c7208e947c8a -->
+<!-- makedone-spec version=1 sha256=dd58c04da9481e4f5c6788bdd915132a70f37d2e1f66d61b8c850d0fd9f262bd -->
 # makedone SPEC — v1
 
 ## Files first
@@ -115,7 +115,10 @@ frontmatter fields; preserve unknown fields, spelling and existing line endings.
 Read this SPEC and the Project rules in MAKEDONE.md before work.
 Capture anything the user says should be done as a ticket immediately, or a line
 in inbox.md for an idea; do not wait for explicit assignment.
-Host DONE.md remains the chronological log for unplanned work.
+Unplanned work completed in a session at the user's request is recorded with mdo log:
+a ticket created directly in done/ with status done (the request is the acceptance).
+There is no separate DONE.md log. Number 000 (KEY-000) is reserved for a project's
+pre-makedone history (the former DONE.md, verbatim); new numbers start at 1.
 Change plans become epic tickets; state/reference docs remain docs. Supporting
 analyses go in ticket sibling directories. Root AGENTS.md may point to this SPEC
 and the marker's Project rules; insertion is explicit and append-only.
@@ -127,6 +130,8 @@ naming mismatches, dangling references, dependency cycles, invalid fields,
 missing timestamps and status/location mismatches. Repairs are proposals for
 review, never automatic prose rewrites. Report outdated or modified SPEC copies
 by version and SHA-256 hash; legacy hand-written copies are stale.
+References to projects on other hosts are reported as unverified unless the tool
+can reach that host.
 Refresh SPEC only on explicit request with a durable byte-identical backup.
 Preserve marker prose and Project rules. Never overwrite an existing destination.
 New init requires a chosen explicit key; a derived suggestion is not consent.
