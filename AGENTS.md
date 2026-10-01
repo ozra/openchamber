@@ -8,12 +8,13 @@ This file contains only always-on repository rules and routing. Detailed workflo
 
 ## Fork-local requirements
 
-`custom-dev/` is the maintainer's personal PRD backlog for OpenChamber
-customizations. Before any fork-local work — refining or adding a PRD,
-implementing a customized feature, or touching `custom-dev/` — read
-`custom-dev/README.md`. It is the canonical workflow for selecting relevant
-PRDs and references, planning fork work, validation, and user acceptance. Follow
-its context-loading rules instead of reading the whole PRD backlog.
+Fork customizations are tracked as makedone tickets in `makedone/` (key `OCH`,
+formerly `custom-dev/PRD-NNN`). Before any fork-local work — refining or adding a
+ticket, implementing a customized feature, or touching `makedone/` or
+`custom-dev/` — read `makedone/SPEC.md`, the Project rules in
+`makedone/MAKEDONE.md`, and `custom-dev/README.md` (fork engineering guidance:
+customization strategy, settings, validation and user acceptance). Follow the
+context-loading rules in MAKEDONE.md instead of reading the whole backlog.
 
 ## Instruction Order
 

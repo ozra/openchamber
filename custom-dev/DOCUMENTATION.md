@@ -1,9 +1,9 @@
 # custom-dev — Technical design (shared)
 
-This is the shared implementation detail for the PRDs in this directory. It
+This is the shared implementation detail for the OCH tickets (`../makedone/`). It
 focuses on the shared projection, geometry, and decoration contracts used by
-PRD-001 (TimelineRail), PRD-002 (ledger view), PRD-022 (conversation
-decorations), and PRD-023 (user-originated question answers).
+OCH-001 (TimelineRail), OCH-002 (ledger view), OCH-022 (conversation
+decorations), and OCH-023 (user-originated question answers).
 
 ## Data model
 
@@ -25,7 +25,7 @@ System/scope/control entries come from:
 - plan-mode hidden user messages (`isHiddenUserMessage`, `message/hiddenUserMessage.ts`)
 - header/control messages
 
-Per PRD-023, completed question-tool output contains serialized question/answer
+Per OCH-023, completed question-tool output contains serialized question/answer
 pairs rather than a separate SDK user message (`parseQuestionOutput` in
 `ToolPart.tsx`). Project each answer as a user-originated presentation record
 while retaining its owning `messageId`, question `partId`, and question/answer
@@ -44,7 +44,7 @@ second transcript model. Each span carries:
 | `turnId` | Owning turn from `TurnRecord`. |
 | `messageId` | Owning SDK message and the normal Find target. |
 | `partId` | Optional tool, reasoning, or text-part identity for precise targets. |
-| semantic kind | User, assistant, thinking, or the normalized PRD-011 tool identity. |
+| semantic kind | User, assistant, thinking, or the normalized OCH-011 tool identity. |
 
 Use existing authoritative IDs where available. Any fallback span ID must be
 derived deterministically from message identity, part position, and part type,
@@ -164,11 +164,11 @@ measured throughput.
 
 Clicking a span/line scrolls the chat to that message, reusing the existing
 on-select-turn jump from `PromptNavigatorRail`. Bidirectional rail ⇄ ledger ⇄
-chat sync is a later phase (see PRD-002).
+chat sync is a later phase (see OCH-002).
 
 ## Conversation decoration registry
 
-PRD-022 owns the shared contract. Implement it as retained UI-only state keyed
+OCH-022 owns the shared contract. Implement it as retained UI-only state keyed
 by normalized runtime, directory, session, layer ID, and channel. Keep it out of
 the authoritative sync stores.
 
@@ -215,7 +215,7 @@ theme tokens — not `--dsw-*` CSS modules, and not imported DeepSeek packages
 (they depend on a different runtime/event model). See
 `packages/ui/src/index.css` for tokens and `components/ui` for primitives.
 
-Tool and thinking span hues come from the same PRD-011 normalized tool identity
+Tool and thinking span hues come from the same OCH-011 normalized tool identity
 and theme tokens as their message-prefix labels. User prompts and parsed question
 answers share the user-originated visual class. Decorations sit above these
 intrinsic styles; `dimmed` may reduce their intensity or use a dedicated muted
