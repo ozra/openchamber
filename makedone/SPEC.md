@@ -1,4 +1,4 @@
-<!-- makedone-spec version=1 sha256=d46bb35500a1d1949f780e6a74bee4af945b9135d19d7e693785cdb9c597add9 -->
+<!-- makedone-spec version=1 sha256=c1000269b091e8f02abaafd9064a585c02547ec1c5b1de14daa7c7208e947c8a -->
 # makedone SPEC — v1
 
 ## Files first
@@ -18,7 +18,7 @@ the project key and ticket number, not the project's path.
 - done/: finished tickets (status done or closed).
 
 The marker has YAML frontmatter: makedone: <format version> (currently 1), key: KEY,
-and optional name. Tools refuse format versions they do not know; a breaking format
+optional name and optional number_width (integer 3..9, default 3). Tools refuse format versions they do not know; a breaking format
 change bumps the version. Keys match [A-Z][A-Z0-9]{1,5} and must be unique across
 discovered projects. Only MAKEDONE.md is a marker; an ordinary README.md may coexist.
 A directory name alone is not a marker.
@@ -29,9 +29,11 @@ node_modules, .stversions, _archive and /opt/staging; never scan /.
 
 Format: <KEY>[-EPIC]-<NNN>-<slug>.md.
 Regex: ^([A-Z][A-Z0-9]{1,5})(-EPIC)?-([0-9]{3,})-(.+)\.md$
-The id is KEY-NNN; EPIC is not part of it. Numbers are unique per key across
-ordinary tickets, epics and done/. New number = highest used number + 1,
-zero-padded to at least three digits. Slugs are lowercase ASCII hyphenated titles.
+The id is KEY + number, compared numerically (KEY-1 = KEY-001 = KEY-0001); EPIC is
+not part of it. Numbers are unique per key across ordinary tickets, epics, done/ and
+aliases. New number = highest used number + 1. Numbers are zero-padded to the
+project's number_width (marker frontmatter, default 3) only for file sorting; larger
+numbers simply have more digits. mdo repad KEY WIDTH changes the width. Slugs are lowercase ASCII hyphenated titles.
 Title is the first # H1. Cross-project references use full ids such as FLEET-006.
 
 ## Frontmatter (all optional)
@@ -90,7 +92,8 @@ stub: the moved ticket gets supersedes: <old id>, and a file with the old filena
 is created in the old project's done/ with status closed, superseded_by: <new id>
 and a link to the new file. The tool sets this closed status itself; the user's
 migrate command is the decision. All identity changes rewrite known metadata
-references.
+references. mv (renumbering) is meant for repairing duplicate numbers (e.g. concurrent
+creation on two synced machines), not for reordering.
 
 ## Body and comments
 
