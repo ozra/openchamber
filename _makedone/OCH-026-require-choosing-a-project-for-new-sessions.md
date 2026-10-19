@@ -1,5 +1,5 @@
 ---
-status: "draft"
+status: refine
 created: 2026-09-03
 depends_on: []
 complexity: small

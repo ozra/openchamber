@@ -1,6 +1,6 @@
 ---
-kind: "epic"
-status: "draft"
+kind: overview
+status: refine
 created: 2026-09-02
 related: ["OCH-001","OCH-002","OCH-016","OCH-017","OCH-018"]
 aliases: ["PRD-019"]

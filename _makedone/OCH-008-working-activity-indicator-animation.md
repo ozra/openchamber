@@ -1,5 +1,5 @@
 ---
-status: "discover"
+status: refine
 created: 2026-09-01
 kind: "feature"
 aliases: ["PRD-008"]

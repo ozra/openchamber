@@ -1,5 +1,5 @@
 ---
-status: "draft"
+status: refine
 created: 2026-09-02
 related: ["OCH-004","OCH-019"]
 kind: "feature"

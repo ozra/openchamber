@@ -1,5 +1,5 @@
 ---
-status: "closed"
+status: dropped
 created: 2026-09-01
 kind: "feature"
 aliases: ["PRD-006"]

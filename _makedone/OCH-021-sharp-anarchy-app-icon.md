@@ -1,5 +1,5 @@
 ---
-status: "draft"
+status: refine
 created: 2026-09-02
 kind: "feature"
 aliases: ["PRD-021"]

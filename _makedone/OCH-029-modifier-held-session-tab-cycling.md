@@ -1,5 +1,5 @@
 ---
-status: "draft"
+status: refine
 created: 2026-09-04
 depends_on: []
 deliver_with: ["OCH-028"]

@@ -1,8 +1,9 @@
 ---
-status: "deferred"
+status: refine
 created: 2026-09-01
 kind: "feature"
 aliases: ["PRD-005"]
+priority: "low"
 ---
 
 # Statusbar consolidation
@@ -36,3 +37,9 @@ shows the used-tokens indicator — see PRD-001 for adding tps there).
 
 - Not built now; recorded so the requirement is not lost. Revisit after
   PRD-001/PRD-002 settle.
+
+## Comments
+
+### 2026-10-01 21:40 · agent-coder
+
+Set status=discover; priority=low.
