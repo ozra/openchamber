@@ -1,6 +1,6 @@
 # custom-dev — Technical design (shared)
 
-This is the shared implementation detail for the OCH tickets (`../makedone/`). It
+This is the shared implementation detail for the OCH tickets (`../_makedone/`). It
 focuses on the shared projection, geometry, and decoration contracts used by
 OCH-001 (TimelineRail), OCH-002 (ledger view), OCH-022 (conversation
 decorations), and OCH-023 (user-originated question answers).

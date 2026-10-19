@@ -95,8 +95,8 @@ of pinning it to 1; the shortcuts schema gained plus/minus key tokens and an
 
 ### 10. Fork-local docs and agent instructions
 
-- `makedone/` holds the ticket backlog (key OCH, formerly `custom-dev/PRD-NNN`) and
-  its inbox; `custom-dev/` holds the engineering guidance (README.md), the technical
+- `_makedone/` holds the ticket backlog (key OCH, formerly `custom-dev/PRD-NNN`), ideas as
+  `refine` tickets; `custom-dev/` holds the engineering guidance (README.md), the technical
   design (DOCUMENTATION.md) and this index. These are fork-owned planning
   docs, not code changes: they never exist upstream by design.
 - `AGENTS.md` carries a fork-local requirements section pointing agents at

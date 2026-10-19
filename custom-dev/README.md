@@ -1,9 +1,9 @@
 # custom-dev: fork engineering guidance for OpenChamber customizations
 
 Personal customizations built on top of OpenChamber are **fork-owned** work. They are tracked
-as makedone tickets in `../makedone/` (key **OCH**). Read `../makedone/SPEC.md` and the Project
-rules in `../makedone/MAKEDONE.md` before ticket work. Ideas go to `../makedone/inbox.md`
-(`mdo inbox "..."`).
+as makedone tickets in `../_makedone/` (key **OCH**). Read `../_makedone/MAKEDONE.md` (ways of
+working) before ticket work. Ideas become `refine` tickets (`mdo new "..."`); no implementation
+while a ticket is in `refine`.
 
 > Migrated 2026-10-01: the former `PRD-NNN` files became `OCH-NNN` (same numbers; old ids are
 > aliases, so `mdo show PRD-031` still works). The PRD files themselves were removed (git history

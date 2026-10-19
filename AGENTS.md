@@ -8,11 +8,11 @@ This file contains only always-on repository rules and routing. Detailed workflo
 
 ## Fork-local requirements
 
-Fork customizations are tracked as makedone tickets in `makedone/` (key `OCH`,
+Fork customizations are tracked as makedone tickets in `_makedone/` (key `OCH`,
 formerly `custom-dev/PRD-NNN`). Before any fork-local work — refining or adding a
-ticket, implementing a customized feature, or touching `makedone/` or
-`custom-dev/` — read `makedone/SPEC.md`, the Project rules in
-`makedone/MAKEDONE.md`, and `custom-dev/README.md` (fork engineering guidance:
+ticket, implementing a customized feature, or touching `_makedone/` or
+`custom-dev/` — read the ways of working in
+`_makedone/MAKEDONE.md` (format: `mdo --spec`), and `custom-dev/README.md` (fork engineering guidance:
 customization strategy, settings, validation and user acceptance). Follow the
 context-loading rules in MAKEDONE.md instead of reading the whole backlog.
 
