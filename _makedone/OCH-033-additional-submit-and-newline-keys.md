@@ -127,8 +127,8 @@ composer, app binding intact outside) is what keeps the two from fighting.
   (without them the settings reset on restart).
 - Settings UI next to the existing composer controls and settings search
   entries in `lib/settings/search.ts`.
-- i18n: proper English text, `TRANSLATE ME` in the other locales, per the
-  custom-dev README.
+- i18n: proper English text in `en.ts` only; other locales fall back to English,
+  per the custom-dev README.
 - Guard with `isIMECompositionEvent` like the rest of the composer.
 
 ## Acceptance criteria

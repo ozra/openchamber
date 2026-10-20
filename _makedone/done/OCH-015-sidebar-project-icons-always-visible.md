@@ -59,3 +59,19 @@ Set ended=2026-09-04 07:40.
 ### 2026-10-01 18:15 · agent-coder
 
 ended backfilled from git history: commit that moved PRD-015 into custom-dev/done/.
+
+### 2026-10-20 18:07 · oscar
+
+Resolved against merge/upstream-2.5.0 (OCH-040): the behaviour is unconditional, not a setting — SessionSidebar.tsx:346 pins alwaysShowSidebarActions = true, so web and desktop show the icons in their muted tone at rest. The settings.openchamber.sidebar.field.actionsAlwaysVisible* strings are upstream leftovers (translated in 12 locales, no registry field, no control) and are deliberately left alone.
+
+### 2026-10-20 18:20 · agent
+
+Ownership correction, superseding the previous comment: the actionsAlwaysVisible strings are the fork's own, not upstream leftovers. git log -S shows exactly one commit ever touching them — a5992eaf8 (2026-09-04, 'feat: sidebar keep-open, hide header new-session, always-visible icons'), which added them to en.settings.ts plus eight locale sub-dicts. Upstream never had the key: per this ticket's own Background, upstream's alwaysShowActions was mobileVariant || isTablet. The setting (sidebarActionsAlwaysVisible: lib/api/types.ts + settings-helpers.js allowlist + SidebarSettings.tsx UI) was removed by today's merge commit 94306b36c, which deleted SidebarSettings.tsx and replaced the choice with the uncommented 'const alwaysShowSidebarActions = true' in SessionSidebar.tsx:346. Whether always-on is the accepted outcome or the toggle should return via SETTINGS_REGISTRY is an open product question.
+
+### 2026-10-20 18:27 · oscar
+
+Decided: always-on stays, the setting is gone for good. Removed the actionsAlwaysVisible{,Aria,Hint} strings from the twelve dictionary files that still carried them (36 lines), and commented the 'const alwaysShowSidebarActions = true' in SessionSidebar.tsx so nobody searches for a setting again. The one remaining mention is the server test that asserts retired sidebar keys are dropped from updates and responses (settings-helpers.test.js:252) — kept on purpose, because settings.json on existing installs still holds the old key from September and that test proves it stays inert. Validation: bun test packages/ui/src/lib/i18n/ (40 pass, key parity intact), type-check:ui clean, lint:ui clean.
+
+### 2026-10-20 19:02 · agent
+
+Correction to the count in the comment above: the actionsAlwaysVisible{,Aria,Hint} strings lived in fifteen dictionary files, not twelve, and the deletion is 45 lines, not 36. Besides the twelve settings sub-dicts, ar, he and nl carried the three keys inline in their main dictionaries, the same three files that held all 54 TRANSLATE ME placeholders. Fork-DIFFERENCES section 6 now says fifteen.

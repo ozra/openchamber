@@ -68,3 +68,7 @@ Set ended=2026-09-04 07:40.
 ### 2026-10-01 18:15 · agent-coder
 
 ended backfilled from git history: commit that moved PRD-014 into custom-dev/done/.
+
+### 2026-10-20 18:07 · oscar
+
+Resolved against merge/upstream-2.5.0 (OCH-040): the header New-session half is superseded by upstream, which no longer renders a global New-session button in the sidebar header, so there is nothing to hide. The fork keeps no trace of the setting — no registry field, no strings, no control (the stale tr/de copies were deleted on 2026-10-20). The keep-open half is live as sidebarKeepOpen, toggled from the sidebar header.

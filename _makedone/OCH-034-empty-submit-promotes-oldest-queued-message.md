@@ -98,8 +98,8 @@ default **true**.
   (without it the setting resets on restart).
 - Settings UI next to the composer controls and settings search entry in
   `lib/settings/search.ts`.
-- i18n: proper English text, `TRANSLATE ME` in the other locales, per the
-  custom-dev README.
+- i18n: proper English text in `en.ts` only; other locales fall back to English,
+  per the custom-dev README.
 
 ## Acceptance criteria
 

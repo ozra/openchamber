@@ -77,7 +77,7 @@ code is a cycling state machine plus a placeholder render mode on the chat area.
 
 1. **Commands** — add `cycle_session_tab_next` and `cycle_session_tab_previous`
    to `SHORTCUT_SCHEMA`, `customizable: true`, with `settingsLabelKey`s and
-   English text in every locale (`TRANSLATE ME` elsewhere, per the
+   English text in `en.ts` only (other locales fall back to English, per the
    localization note in `README.md`). Defaults `ctrl+tab` and `ctrl+shift+tab`.
 2. **Cycling session** — the first press starts a cycling session: a pending
    index initialized to the current session's position in the rendered strip
