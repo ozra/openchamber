@@ -343,6 +343,9 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
   const isDesktopShellRuntime = React.useMemo(() => isDesktopShell(), []);
 
   const { isTablet } = useDeviceInfo();
+  // Fork decision (OCH-015): sidebar row actions stay visible at rest in their
+  // muted tone on every surface, so this is deliberately not a setting. Upstream
+  // reveals them on hover and shows them at rest only where there is no hover.
   const alwaysShowSidebarActions = true;
 
 
