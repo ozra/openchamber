@@ -16,6 +16,14 @@ ticket, implementing a customized feature, or touching `_makedone/` or
 customization strategy, settings, validation and user acceptance). Follow the
 context-loading rules in MAKEDONE.md instead of reading the whole backlog.
 
+Where a project skill and `custom-dev/README.md` disagree on a fork choice, the
+README wins for fork-local work, and the difference is recorded there rather than
+written into an upstream skill or locale file. The standing case is i18n: new or
+changed keys go to `packages/ui/src/lib/i18n/messages/en.ts` only, and every other
+locale falls back to English (OCH-039). That overrides the "every locale must hold a
+real translation" rule in `locale-ui-patterns`, which still applies to upstream
+contributions, where a real translation simply wins over the fallback.
+
 ## Instruction Order
 
 These steps are mandatory. Before editing, you **MUST**:

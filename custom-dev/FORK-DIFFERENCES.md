@@ -56,12 +56,26 @@ Adopts upstream's `enterToSend` toggle with three fork overrides:
 The edits live in `composer/keyboardPolicy.ts`, `chat/ChatInput.tsx` (sendNow
 derivation) and `stores/useUIStore.ts` (the default).
 
-### 6. Sidebar keep-open, header new-session hide, action icons always visible (OCH-014/015, done)
+### 6. Sidebar keep-open and always-visible row actions (OCH-014/015, done)
 
-Three shared settings: `sidebarKeepOpen`, `sidebarHideHeaderNewSession`,
-`sidebarActionsAlwaysVisible`. New `SidebarSettings.tsx` UI; the sidebar shell
-and session/project rows honor them. Server allowlist in
-`settings-helpers.js`.
+Two live differences, and one entry that has since been overtaken:
+
+- **Keep the sidebar open** — `sidebarKeepOpen` (`registry.ts:374`, `profile`),
+  toggled from the sidebar header (`SidebarHeader.tsx:156`), not from the Settings
+  page.
+- **Row actions always visible** — no setting. `SessionSidebar.tsx` pins
+  `alwaysShowSidebarActions = true`, so project, group and session action icons
+  stay on screen in their muted tone on web and desktop instead of waiting for
+  hover; upstream shows them at rest only where there is no hover. The fork's own
+  toggle (`sidebarActionsAlwaysVisible`, with a `SidebarSettings.tsx` control) was
+  removed by the v2.5.0 merge commit, and its `actionsAlwaysVisible{,Aria,Hint}`
+  strings were deleted from the fifteen dictionary files that carried them: the
+  twelve settings sub-dicts plus the `ar`, `he` and `nl` main dicts, which hold
+  their `settings.*` keys inline.
+- **Hide the header "New session" button** — dropped. Upstream no longer has a
+  global New-session button in the sidebar header, so there is nothing left for the
+  setting to hide, and the fork keeps no trace of it (no registry field, no
+  strings, no control).
 
 ### 7. Chat paging and desktop zoom shortcuts (OCH-010, done)
 
@@ -101,6 +115,14 @@ of pinning it to 1; the shortcuts schema gained plus/minus key tokens and an
   docs, not code changes: they never exist upstream by design.
 - `AGENTS.md` carries a fork-local requirements section pointing agents at
   `custom-dev/README.md`.
+
+### 11. English fallback in every locale dictionary (OCH-039, done)
+
+All 14 non-English locale files in `packages/ui/src/lib/i18n/messages/` import the
+English dict and spread it first (`...enDict`) inside their own dict. Effect: fork
+i18n keys live in `en.ts` only and read as English on other locales, and the
+upstream key-parity test stays green without editing it. Four stale keys left by
+the old `TRANSLATE ME` convention were deleted (`de.settings.ts`, `tr.settings.ts`).
 
 ## Keeping this current
 

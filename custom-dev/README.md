@@ -52,20 +52,52 @@ to copy every component.
 
 ## Cross-cutting note on localization
 
-English is the only supported language for this fork. Give every new or changed
-i18n key proper English text. Keep the key present in every other locale file but use the exact value `TRANSLATE ME` instead of spending
-time on unsupported translations. Proper translations can be done as a separate
-effort later.
+English is the only supported language for this fork. Add new or changed i18n keys
+to the English dictionary only — `packages/ui/src/lib/i18n/messages/en.ts`, or its
+settings sub-dictionary `en.settings.ts` for anything under `settings.*` (en.ts
+spreads it) — and leave the other locale files alone. Every locale dictionary
+spreads the English dictionary first (`...enDict`, OCH-039) and `formatMessage`
+falls back to English for any key a locale lacks, so an untranslated string reads
+as English rather than as a placeholder.
+
+Do not write `TRANSLATE ME` values: the UI still has a language switcher, so a
+visitor who picks another language would read the placeholder verbatim, and
+touching 14 upstream locale files per ticket is merge-conflict surface for nothing.
+
+`messages.test.ts` keeps enforcing key parity with English. Adding a key to `en.ts`
+alone satisfies it. What fails it is a *stale* key: when you rename or remove a key
+from `en.ts`, delete it from the locale (or `*.settings.ts`) files too.
+
+Where this conflicts with `.agents/skills/locale-ui-patterns` ("every key you add to
+a non-English dictionary MUST contain a real translation"), that is upstream's rule
+for upstream contributions and it still holds there — a real translation simply
+overrides the spread. For fork work, this README governs: English only, `en.ts` only.
 
 ## Adding persisted settings
 
-A shared setting must survive the full round trip. Add its client type, store
-default and setter, hydration/apply logic, and write path. Then add it to the
-server allowlist in `packages/web/server/lib/opencode/settings-helpers.js`; that
-allowlist controls both writes to `settings.json` and fields returned by the
-settings API. Add a focused sanitizer/response test in
-`settings-helpers.test.js`. Without the server entry, the UI appears to save the
-setting but resets it to the client default after a restart.
+(Updated for the OpenCode 2.x settings registry; the old "server allowlist in
+`settings-helpers.js`" no longer exists.) One table owns every setting:
+`SETTINGS_REGISTRY` in `packages/ui/src/lib/settings/registry.ts`. A key that is
+not in the registry does not persist at all. The authoritative procedure is
+"Adding a setting" in `packages/ui/src/lib/settings/DOCUMENTATION.md`:
+
+1. Add one registry entry: `scope` (`instance` | `profile` | `device`), a parser
+   from `parsers.ts`, and a `ui` binding (read/write into the owning store, using
+   an existing setter so side effects run). Sidebar display toggles are usually
+   `scope: 'profile'` with `perSurface: true`, like `sidebarViewMode`, so a choice
+   on one surface kind (web/desktop/vscode/mobile) does not flip the others.
+   Defaults live in the store's initial state, not in the registry.
+2. Run `bun run settings-registry:generate` and commit both generated snapshots:
+   `packages/web/server/lib/opencode/settings-registry.json` (the server's
+   persistable-key list) and `packages/vscode/src/settings-registry.json` (the
+   extension-host bridge).
+3. Only when the server must validate beyond the registry gate, add a branch to
+   `sanitizeSettingsUpdate` in `packages/web/server/lib/opencode/settings-helpers.js`
+   and a sample value in the drift test `settings-helpers.test.js`.
+4. Add the Settings control and search entry per the `settings-ui-patterns` skill.
+
+The client type, sanitizer, mirror, apply step and auto-save all derive from the
+registry entry; there is no second list to update.
 
 ## Validation and user acceptance
 
