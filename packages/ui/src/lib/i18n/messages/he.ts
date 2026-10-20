@@ -25,25 +25,11 @@ import { pluginsGridI18n } from './plugins-grid.i18n';
 import { integrationsCatalogI18n } from './integrations-catalog.i18n';
 import { diffFindI18n } from './diff-find.i18n';
 
+import { dict as enDict } from './en';
+
 export const dict = {
-  'settings.openchamber.keyboardShortcuts.action.scroll_chat_history_up.label': 'TRANSLATE ME',
-  'settings.openchamber.keyboardShortcuts.action.scroll_chat_history_down.label': 'TRANSLATE ME',
-  'settings.openchamber.visual.field.arrowKeyPromptHistoryAria': 'TRANSLATE ME',
-  'settings.openchamber.visual.field.arrowKeyPromptHistory': 'TRANSLATE ME',
-  'settings.openchamber.visual.field.arrowKeyPromptHistoryHint': 'TRANSLATE ME',
-  'settings.openchamber.sidebar.title': 'TRANSLATE ME',
-  'settings.openchamber.sidebar.tooltip': 'TRANSLATE ME',
-  'settings.openchamber.sidebar.field.actionsAlwaysVisible': 'TRANSLATE ME',
-  'settings.openchamber.sidebar.field.actionsAlwaysVisibleAria': 'TRANSLATE ME',
-  'settings.openchamber.sidebar.field.actionsAlwaysVisibleHint': 'TRANSLATE ME',
-  'sessions.sidebar.header.actions.keepSidebarOpen': 'TRANSLATE ME',
-  'sessions.sidebar.header.actions.autoCloseSidebar': 'TRANSLATE ME',
-  'sessions.sidebar.header.actions.newMultiRun': 'TRANSLATE ME',
-  'quota.pace.aria.onPace': 'TRANSLATE ME',
-  'quota.pace.aria.aheadOne': 'TRANSLATE ME',
-  'quota.pace.aria.aheadMany': 'TRANSLATE ME',
-  'quota.pace.aria.behindOne': 'TRANSLATE ME',
-  'quota.pace.aria.behindMany': 'TRANSLATE ME',
+  // Keys this locale has not translated resolve to English through this spread.
+  ...enDict,
   'opencodeCompatibility.bundled': 'OpenCode מגיע יחד עם OpenChamber. יש לעדכן את OpenChamber כדי לקבל את OpenCode v2.',
   'opencodeCompatibility.title': 'נדרש OpenCode v2',
   'opencodeCompatibility.outdatedTitle': 'עדכן את OpenCode',
