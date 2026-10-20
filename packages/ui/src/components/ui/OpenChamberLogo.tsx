@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useOptionalThemeSystem } from '@/contexts/useThemeSystem';
 import { useI18n } from '@/lib/i18n';
+import { useWaitingPhase } from '@/hooks/useDurationTicker';
 
 const LEFT_FACE_CELL_OPACITIES = [
   0.2, 0.45, 0.15, 0.55,
@@ -21,6 +22,7 @@ interface OpenChamberLogoProps {
   width?: number;
   height?: number;
   isAnimated?: boolean;
+  variant?: 'default' | 'splash';
 }
 
 // Generate grid cells for a face (4x4 grid)
@@ -83,9 +85,13 @@ export const OpenChamberLogo: React.FC<OpenChamberLogoProps> = ({
   width = 70,
   height = 70,
   isAnimated = false,
+  variant = 'default',
 }) => {
   const { t } = useI18n();
   const themeContext = useOptionalThemeSystem();
+  // While loading, the glow switches on and off each second on the shared
+  // clock. A smooth drop-shadow pulse repainted the logo on every frame.
+  const glowing = useWaitingPhase(isAnimated, 2) === 1;
 
   let isDark = true;
   if (themeContext) {
@@ -95,6 +101,10 @@ export const OpenChamberLogo: React.FC<OpenChamberLogoProps> = ({
   }
 
   const strokeColor = useMemo(() => {
+    // Startup stages share the pre-paint palette while the app theme hydrates.
+    if (variant === 'splash') {
+      return 'var(--splash-stroke, var(--surface-foreground))';
+    }
     if (themeContext) {
       return themeContext.currentTheme.colors.surface.foreground;
     }
@@ -105,7 +115,7 @@ export const OpenChamberLogo: React.FC<OpenChamberLogoProps> = ({
       }
     }
     return isDark ? 'white' : 'black';
-  }, [themeContext, isDark]);
+  }, [themeContext, isDark, variant]);
 
   const supportsColorMix = useMemo(() => {
     if (typeof window === 'undefined' || typeof CSS === 'undefined' || typeof CSS.supports !== 'function') {
@@ -115,6 +125,9 @@ export const OpenChamberLogo: React.FC<OpenChamberLogoProps> = ({
   }, []);
 
   const fillColor = useMemo(() => {
+    if (variant === 'splash') {
+      return `var(--splash-face-fill, color-mix(in srgb, ${strokeColor} 15%, transparent))`;
+    }
     if (themeContext) {
       if (supportsColorMix) {
         return `color-mix(in srgb, ${strokeColor} 15%, transparent)`;
@@ -128,9 +141,12 @@ export const OpenChamberLogo: React.FC<OpenChamberLogoProps> = ({
       }
     }
     return isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
-  }, [themeContext, supportsColorMix, strokeColor, isDark]);
+  }, [themeContext, supportsColorMix, strokeColor, isDark, variant]);
 
   const cellHighlightColor = useMemo(() => {
+    if (variant === 'splash') {
+      return `var(--splash-cell-fill, color-mix(in srgb, ${strokeColor} 35%, transparent))`;
+    }
     if (themeContext) {
       if (supportsColorMix) {
         return `color-mix(in srgb, ${strokeColor} 35%, transparent)`;
@@ -144,7 +160,7 @@ export const OpenChamberLogo: React.FC<OpenChamberLogoProps> = ({
       }
     }
     return isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.4)';
-  }, [themeContext, supportsColorMix, strokeColor, isDark]);
+  }, [themeContext, supportsColorMix, strokeColor, isDark, variant]);
 
   const logoFillColor = strokeColor;
 
@@ -195,7 +211,7 @@ export const OpenChamberLogo: React.FC<OpenChamberLogoProps> = ({
       aria-label={t('openChamberLogo.aria.logo')}
     >
       {isAnimated ? (
-        <style>{`@keyframes oc-logo-glow{0%,100%{filter:drop-shadow(0 0 0 transparent)}50%{filter:drop-shadow(0 0 4px var(--oc-glow-color))}}.oc-logo-glow{animation:oc-logo-glow 1.8s ease-in-out infinite}@media (prefers-reduced-motion:reduce){.oc-logo-glow{animation:none}}`}</style>
+        <style>{`.oc-logo-glow-on{filter:drop-shadow(0 0 4px var(--oc-glow-color))}@media (prefers-reduced-motion:reduce){.oc-logo-glow-on{filter:none}}`}</style>
       ) : null}
       {/* Left face - base fill */}
       <path
@@ -247,7 +263,7 @@ export const OpenChamberLogo: React.FC<OpenChamberLogoProps> = ({
       {/* OpenCode logo on top face */}
       <g
         opacity={1}
-        className={isAnimated ? 'oc-logo-glow' : undefined}
+        className={glowing ? 'oc-logo-glow-on' : undefined}
         style={isAnimated ? ({ '--oc-glow-color': strokeColor } as React.CSSProperties) : undefined}
       >
         {/*

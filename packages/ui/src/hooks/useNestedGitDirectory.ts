@@ -6,6 +6,7 @@ import {
   useEffectiveGitDirectory,
   useGitStore,
   useIsGitRepo,
+  useIsUnbornGitRepo,
   useNestedRepoSelection,
   useNestedRepos,
   useStaleClearedSelections,
@@ -14,6 +15,12 @@ import {
 type UseNestedGitDirectoryOptions = {
   /** False defers all probing/discovery work while the surface is hidden. */
   enabled?: boolean;
+  /**
+   * Re-probe a cached "not a repository" root each time the surface becomes
+   * enabled. For surfaces the user opens to look at git (Changes, Git), not
+   * for ones that render alongside every session.
+   */
+  recheckOnOpen?: boolean;
 };
 
 /**
@@ -22,17 +29,25 @@ type UseNestedGitDirectoryOptions = {
  * root, discovering nested repositories, auto-selecting the first one, and
  * dropping a selection whose repository disappeared.
  *
+ * A root repository with no commits yet (a fresh `git init`, #4886) hides
+ * nothing below it: discovery keeps running, a nested selection keeps
+ * applying, and the picker offers the root next to the nested repositories.
+ * It is a repository the user may mean to work in, so nothing is
+ * auto-selected for it.
+ *
  * Consumers still fetch their own git data for the returned `gitDirectory`;
- * this hook only owns who that directory is.
+ * this hook only owns who that directory is. `repositoryOptions` is what a
+ * repository picker lists, or null when the surface has no choice to offer.
  */
 export const useNestedGitDirectory = (
   root: string | null,
   options: UseNestedGitDirectoryOptions = {},
 ) => {
-  const { enabled = true } = options;
+  const { enabled = true, recheckOnOpen = false } = options;
   const { git } = useRuntimeAPIs();
 
   const rootIsGitRepo = useIsGitRepo(root);
+  const rootIsUnborn = useIsUnbornGitRepo(root);
   const gitDirectory = useEffectiveGitDirectory(root);
   const nestedRepos = useNestedRepos(root);
   const nestedRepoSelection = useNestedRepoSelection(root);
@@ -44,9 +59,10 @@ export const useNestedGitDirectory = (
     gitDirectory && gitDirectory !== root ? gitDirectory : null,
   );
 
-  const { ensureStatus, ensureNestedRepos, selectNestedRepo, clearNestedRepoSelection } = useGitStore(
+  const { ensureStatus, recheckRepository, ensureNestedRepos, selectNestedRepo, clearNestedRepoSelection } = useGitStore(
     useShallow((state) => ({
       ensureStatus: state.ensureStatus,
+      recheckRepository: state.recheckRepository,
       ensureNestedRepos: state.ensureNestedRepos,
       selectNestedRepo: state.selectNestedRepo,
       clearNestedRepoSelection: state.clearNestedRepoSelection,
@@ -61,12 +77,25 @@ export const useNestedGitDirectory = (
     void ensureStatus(root, git);
   }, [enabled, ensureStatus, git, root, rootIsGitRepo]);
 
-  // Discover nested repositories once the root probe confirms it is not one.
+  // A cached "not a repository" answer may be stale: `git init` in a terminal
+  // or by an agent leaves no event behind. So may a cached "no commits yet"
+  // answer once the first commit lands while a nested repository is shown.
+  // Opening the surface checks again, once per opening, so it never needs to
+  // poll.
+  React.useEffect(() => {
+    if (!recheckOnOpen || !enabled || !root) return;
+    const rootState = useGitStore.getState().directories.get(root);
+    if (rootState?.isGitRepo !== false && rootState?.status?.unborn !== true) return;
+    void recheckRepository(root, git);
+  }, [enabled, git, recheckOnOpen, recheckRepository, root]);
+
+  // Discover nested repositories once the root probe confirms it is not one,
+  // or is one with no commits yet.
   React.useEffect(() => {
     if (!enabled || !root) return;
-    if (rootIsGitRepo !== false) return;
+    if (rootIsGitRepo !== false && !rootIsUnborn) return;
     void ensureNestedRepos(root);
-  }, [enabled, ensureNestedRepos, root, rootIsGitRepo]);
+  }, [enabled, ensureNestedRepos, root, rootIsGitRepo, rootIsUnborn]);
 
   // Auto-select the first nested repository so the surface opens straight
   // into repository data; a picker (where rendered) switches between them.
@@ -115,5 +144,10 @@ export const useNestedGitDirectory = (
     selectedIsGitRepo,
   ]);
 
-  return { rootIsGitRepo, gitDirectory, nestedRepos, nestedRepoSelection };
+  const discovered = Array.isArray(nestedRepos) && nestedRepos.length > 0 ? nestedRepos : null;
+  let repositoryOptions: string[] | null = null;
+  if (discovered && root && rootIsUnborn) repositoryOptions = [root, ...discovered];
+  else if (discovered && rootIsGitRepo === false) repositoryOptions = discovered;
+
+  return { rootIsGitRepo, gitDirectory, nestedRepos, nestedRepoSelection, repositoryOptions };
 };

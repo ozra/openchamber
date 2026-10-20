@@ -1,4 +1,6 @@
 import * as gitApiHttp from '@openchamber/ui/lib/gitApiHttp';
+import { configureWebAuxiliaryBinding, configureWebTransportBinding, removeWebTransportBinding } from './source-control';
+import { managedSshCredentials } from './managed-ssh';
 import type {
   GitAPI,
   CreateGitCommitOptions,
@@ -6,9 +8,15 @@ import type {
 } from '@openchamber/ui/lib/api/types';
 
 export const createWebGitAPI = (): GitAPI => ({
+  managedSshCredentials,
+  configureTransportBinding: configureWebTransportBinding,
+  removeTransportBinding: removeWebTransportBinding,
+  configureAuxiliaryBinding: configureWebAuxiliaryBinding,
   checkIsGitRepository: gitApiHttp.checkIsGitRepository,
   getGitStatus: gitApiHttp.getGitStatus,
+  prefetchProjectStatuses: gitApiHttp.prefetchProjectStatuses,
   getGitDiff: gitApiHttp.getGitDiff,
+  getGitDiffs: gitApiHttp.getGitDiffs,
   getGitFileDiff: gitApiHttp.getGitFileDiff,
   getGitRangeDiff: gitApiHttp.getGitRangeDiff,
   getGitRangeFiles: gitApiHttp.getGitRangeFiles,
@@ -25,7 +33,6 @@ export const createWebGitAPI = (): GitAPI => ({
   getGitBranches: gitApiHttp.getGitBranches,
   getGitUnpushedBranchCounts: gitApiHttp.getGitUnpushedBranchCounts,
   deleteGitBranch: gitApiHttp.deleteGitBranch as GitAPI['deleteGitBranch'],
-  deleteRemoteBranch: gitApiHttp.deleteRemoteBranch as GitAPI['deleteRemoteBranch'],
   removeRemote: gitApiHttp.removeRemote as GitAPI['removeRemote'],
   generateCommitMessage: gitApiHttp.generateCommitMessage,
   generatePullRequestDescription: gitApiHttp.generatePullRequestDescription,
@@ -41,6 +48,14 @@ export const createWebGitAPI = (): GitAPI => ({
   gitPush: gitApiHttp.gitPush,
   gitPull: gitApiHttp.gitPull,
   gitFetch: gitApiHttp.gitFetch,
+  planNetworkOperation: gitApiHttp.planNetworkOperation,
+  issueContributorDestination: gitApiHttp.issueContributorDestination,
+  listContributorDestinations: gitApiHttp.listContributorDestinations,
+  inspectCheckoutTrust: gitApiHttp.inspectCheckoutTrust,
+  decideCheckoutTrust: gitApiHttp.decideCheckoutTrust,
+  executeNetworkOperation: gitApiHttp.executeNetworkOperation,
+  getNetworkOperation: gitApiHttp.getNetworkOperation,
+  cancelNetworkOperation: gitApiHttp.cancelNetworkOperation,
   listGitStashes: gitApiHttp.listGitStashes,
   countGitStashFiles: gitApiHttp.countGitStashFiles,
   stashGitChanges: gitApiHttp.stashGitChanges,
@@ -54,6 +69,7 @@ export const createWebGitAPI = (): GitAPI => ({
     return gitApiHttp.getGitLog(directory, options);
   },
   getCommitFiles: gitApiHttp.getCommitFiles,
+  getGitCommitDiff: gitApiHttp.getGitCommitDiff,
   getCurrentGitIdentity: gitApiHttp.getCurrentGitIdentity,
   hasLocalIdentity: gitApiHttp.hasLocalIdentity,
   setGitIdentity: gitApiHttp.setGitIdentity,
@@ -82,5 +98,6 @@ export const createWebGitAPI = (): GitAPI => ({
     preview: gitApiHttp.previewGitWorktree,
     create: gitApiHttp.createGitWorktree,
     remove: gitApiHttp.deleteGitWorktree,
+    snapshot: gitApiHttp.snapshotGitWorktree,
   },
 });

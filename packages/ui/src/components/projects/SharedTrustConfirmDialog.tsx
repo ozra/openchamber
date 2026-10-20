@@ -21,7 +21,9 @@ import {
  * App-level dialog shown the first time a team's shared setup commands or
  * shared actions (from `<repo>/.openchamber/project.json`) are about to run.
  * It lists exactly what would run. Dismissing via the close button, Escape,
- * or the backdrop counts as "run without the shared commands this time".
+ * or the backdrop settles the request the way it asked to be dismissed:
+ * worktree creation cancels, everything else runs without the shared
+ * commands this time.
  */
 export const SharedTrustConfirmDialog = () => {
   const { t } = useI18n();
@@ -40,15 +42,17 @@ export const SharedTrustConfirmDialog = () => {
       open={Boolean(request)}
       onOpenChange={(open: boolean) => {
         if (!open) {
-          settle('skip');
+          settle(request?.dismissChoice ?? 'skip');
         }
       }}
     >
-      <DialogContent>
+      <DialogContent layerClassName="z-[70]" backdropProps={{ className: 'z-[70]' }}>
         <DialogHeader>
           <DialogTitle>{t('projects.sharedTrust.title')}</DialogTitle>
           <DialogDescription>
-            {t('projects.sharedTrust.description', { path: request?.sharedPath ?? '' })}
+            {request?.runsIn === 'space'
+              ? t('spaces.sharedTrust.description', { path: request.sharedPath })
+              : t('projects.sharedTrust.description', { path: request?.sharedPath ?? '' })}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">

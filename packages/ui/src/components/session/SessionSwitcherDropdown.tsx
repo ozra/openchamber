@@ -1,6 +1,8 @@
 import React from 'react';
+import { useSessionTurnActivity } from '@/sync/global-session-status';
+import { getSessionActivityTime } from '@/sync/session-ordering';
 import { Menu as BaseMenu } from '@base-ui/react/menu';
-import type { Session } from '@opencode-ai/sdk/v2';
+import type { Session } from '@/lib/opencode/model';
 
 import {
   DropdownMenu,
@@ -8,8 +10,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Icon } from '@/components/icon/Icon';
+import { SessionActivityIndicator } from '@/components/session/SessionActivityIndicator';
+import { useWaitingBlink } from '@/hooks/useDurationTicker';
 import { useSessionUIStore } from '@/sync/session-ui-store';
-import { useGlobalSessionStatus } from '@/sync/sync-context';
 import { useSessionUnseenCount } from '@/sync/notification-store';
 import {
   findSwitcherItemAncestorIds,
@@ -17,7 +20,6 @@ import {
   type SwitcherItem,
 } from '@/components/session/sidebar/shell/useSwitcherItems';
 import { useUIStore } from '@/stores/useUIStore';
-import { useProjectsStore } from '@/stores/useProjectsStore';
 import { resolveGlobalSessionDirectory } from '@/stores/useGlobalSessionsStore';
 import { formatSessionCompactDateLabel } from './sidebar/utils';
 import type { SessionNode } from './sidebar/types';
@@ -81,13 +83,6 @@ function SwitcherContent({ onSelect, variant, scopeProjectId }: SwitcherContentP
   const items = useSwitcherItems(true, { scopeProjectId, currentSessionId });
   const openNewSessionDraft = useSessionUIStore((state) => state.openNewSessionDraft);
   const { t } = useI18n();
-  // PRD-014: hiding the global "New session" button also removes this
-  // dropdown's sibling item. The fallback keeps it reachable when no
-  // projects are present.
-  const sidebarHideHeaderNewSession = useUIStore((state) => state.sidebarHideHeaderNewSession);
-  const projectCount = useProjectsStore((state) => state.projects.length);
-  const showHeaderNewSession = !sidebarHideHeaderNewSession || projectCount === 0;
-
   const handleNewSession = React.useCallback(() => {
     onSelect();
     openNewSessionDraft();
@@ -141,7 +136,6 @@ function SwitcherContent({ onSelect, variant, scopeProjectId }: SwitcherContentP
       disableHorizontal
     >
       <div className="space-y-0.5">
-        {showHeaderNewSession ? (
         <BaseMenu.Item
           data-switcher-item-id={NEW_SESSION_SWITCHER_TARGET}
           onClick={handleNewSession}
@@ -151,11 +145,10 @@ function SwitcherContent({ onSelect, variant, scopeProjectId }: SwitcherContentP
           )}
         >
           <Icon name="chat-new" className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-          <span className="truncate text-[14px] font-normal leading-tight text-foreground">
+          <span className="truncate typography-ui-label font-normal leading-tight text-foreground">
             {t('sessions.sidebar.header.actions.newSession')}
           </span>
         </BaseMenu.Item>
-        ) : null}
         {items.length === 0 ? (
           <div className="px-3 py-4 text-center typography-meta text-muted-foreground">
             {t('sessions.switcher.empty')}
@@ -239,18 +232,18 @@ function SwitcherRow({ session, depth, variant, secondaryMeta, hasChildren, isEx
   const setCurrentSession = useSessionUIStore((state) => state.setCurrentSession);
   const notifyOnSubtasks = useUIStore((state) => state.notifyOnSubtasks);
 
-  const sessionStatus = useGlobalSessionStatus(session.id);
   const unseenCount = useSessionUnseenCount(session.id);
 
   const isActive = currentSessionId === session.id;
   const sessionTitle = session.title?.trim() || t('sessions.sidebar.session.untitled');
   const isSubtask = Boolean((session as Session & { parentID?: string | null }).parentID);
   const needsAttention = unseenCount > 0 && (!isSubtask || notifyOnSubtasks);
-  const statusType = sessionStatus?.type ?? 'idle';
-  const isStreaming = statusType === 'busy' || statusType === 'retry';
+  const turnActivity = useSessionTurnActivity(session.id);
+  const isStreaming = turnActivity !== null;
+  const runningBlink = useWaitingBlink(isStreaming);
   const showUnreadDot = !isStreaming && needsAttention && !isActive;
 
-  const timestamp = session.time?.updated || session.time?.created || Date.now();
+  const timestamp = getSessionActivityTime(session) || Date.now();
   const timeLabel = formatSessionCompactDateLabel(timestamp);
 
   const projectLabel = secondaryMeta?.projectLabel?.trim() || null;
@@ -281,8 +274,9 @@ function SwitcherRow({ session, depth, variant, secondaryMeta, hasChildren, isEx
       className={cn(
         'group relative flex w-full cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 outline-hidden select-none',
         'data-[highlighted]:bg-interactive-hover hover:bg-interactive-hover',
+        isActive && 'bg-interactive-selection text-interactive-selection-foreground hover:bg-interactive-selection data-[highlighted]:bg-interactive-selection',
       )}
-      style={{ paddingLeft: 8 + depth * 12 }}
+      style={{ paddingInlineStart: 8 + depth * 12 }}
     >
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex min-w-0 items-center gap-1.5">
@@ -302,7 +296,7 @@ function SwitcherRow({ session, depth, variant, secondaryMeta, hasChildren, isEx
               {isExpanded ? <Icon name="arrow-down-s" className="h-3.5 w-3.5" /> : <Icon name="arrow-right-s" className="h-3.5 w-3.5" />}
             </span>
           ) : null}
-          <span className={cn('truncate text-[14px] font-normal leading-tight', isActive ? 'text-primary' : 'text-foreground')}>
+          <span dir="auto" className="truncate oc-ui-start-align typography-ui-label font-normal leading-tight text-foreground">
             {sessionTitle}
           </span>
         </div>
@@ -341,19 +335,10 @@ function SwitcherRow({ session, depth, variant, secondaryMeta, hasChildren, isEx
 
       {isStreaming || showUnreadDot ? (
         <span className="flex h-3 w-3 flex-shrink-0 items-center justify-center self-center">
-          {isStreaming ? (
-            <span
-              className="h-1.5 w-1.5 rounded-full bg-primary animate-busy-pulse"
-              aria-label={t('sessions.sidebar.session.status.active')}
-              title={t('sessions.sidebar.session.status.active')}
-            />
-          ) : (
-            <span
-              className="h-1.5 w-1.5 rounded-full bg-[var(--status-info)]"
-              aria-label={t('sessions.sidebar.session.status.unread')}
-              title={t('sessions.sidebar.session.status.unread')}
-            />
-          )}
+          <SessionActivityIndicator
+            state={turnActivity ?? 'unread'}
+            runningClassName={cn('h-2 w-2', runningBlink)}
+          />
         </span>
       ) : null}
     </BaseMenu.Item>

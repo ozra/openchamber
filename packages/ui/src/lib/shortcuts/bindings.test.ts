@@ -64,6 +64,14 @@ const keydown = (key: string, mods: { meta?: boolean; ctrl?: boolean; shift?: bo
   }) as KeyboardEvent;
 
 describe('eventMatchesShortcutPrefix', () => {
+  test('retains an explicit Ctrl+§ binding when its physical code is Backquote', () => {
+    const event = { ...keydown('§', { ctrl: true }), code: 'Backquote' };
+    expect(eventMatchesShortcut(event, 'ctrl+§')).toBe(true);
+    expect(eventMatchesShortcut(event, 'ctrl+`')).toBe(true);
+    expect(eventMatchesShortcut({ ...event, ctrlKey: false }, 'ctrl+§')).toBe(false);
+    expect(eventMatchesShortcut({ ...event, shiftKey: true }, 'ctrl+§')).toBe(false);
+  });
+
   test('matches a bare mod prefix when the primary modifier is held', () => {
     expect(eventMatchesShortcutPrefix(keydown('1', { ctrl: true }), 'mod')).toBe(true);
   });
@@ -152,6 +160,13 @@ describe('layout-independent key matching', () => {
     expect(eventMatchesShortcut(event({ ctrlKey: true, key: 'y', code: 'KeyT' }), 'mod+t')).toBe(false);
   });
 
+  test('the background shortcut matches the shifted letter on any layout and is not a browser shortcut', () => {
+    expect(eventMatchesShortcut(event({ ctrlKey: true, shiftKey: true, key: 'B', code: 'KeyB' }), 'mod+shift+b')).toBe(true);
+    expect(eventMatchesShortcut(event({ ctrlKey: true, shiftKey: true, key: 'И', code: 'KeyB' }), 'mod+shift+b')).toBe(true);
+    expect(eventMatchesShortcut(event({ ctrlKey: true, key: 'b', code: 'KeyB' }), 'mod+shift+b')).toBe(false);
+    expect(isRiskyBrowserShortcut('mod+shift+b')).toBe(false);
+  });
+
   test('resolveShortcutEventDigit reads the digit from the code under Option', () => {
     expect(resolveShortcutEventDigit({ key: '¡', code: 'Digit1' })).toBe('1');
     expect(resolveShortcutEventDigit({ key: '5', code: 'Digit5' })).toBe('5');
@@ -162,5 +177,24 @@ describe('layout-independent key matching', () => {
     expect(eventMatchesShortcut(event({ ctrlKey: true, shiftKey: true, key: '+', code: 'Equal' }), 'mod+plus')).toBe(true);
     expect(eventMatchesShortcut(event({ ctrlKey: true, shiftKey: true, key: '=', code: 'Equal' }), 'mod+plus')).toBe(false);
     expect(eventMatchesShortcut(event({ ctrlKey: true, shiftKey: true, key: 'p', code: 'KeyP' }), 'mod+p')).toBe(false);
+  });
+});
+
+describe('the Super / Windows key', () => {
+  test('normalizes its aliases and orders it after Control', () => {
+    expect(normalizeCombo('shift+win+n')).toBe('super+shift+n');
+    expect(normalizeCombo('super+ctrl+n')).toBe('ctrl+super+n');
+  });
+
+  test('shows as Win on Windows and Super elsewhere', () => {
+    expect(formatShortcutForDisplay('super+n', 'Unassigned', 'windows')).toBe('Win + N');
+    expect(formatShortcutForDisplay('mod+super+n', 'Unassigned', 'other')).toBe('Ctrl + Super + N');
+  });
+
+  test('outside macOS, Meta matches only a combo that asks for Super', () => {
+    expect(eventMatchesShortcut(keydown('n', { meta: true }), 'super+n')).toBe(true);
+    expect(eventMatchesShortcut(keydown('n', { ctrl: true }), 'super+n')).toBe(false);
+    expect(eventMatchesShortcut(keydown('n', { ctrl: true, meta: true }), 'mod+n')).toBe(false);
+    expect(eventMatchesShortcut(keydown('n', { ctrl: true, meta: true }), 'mod+super+n')).toBe(true);
   });
 });

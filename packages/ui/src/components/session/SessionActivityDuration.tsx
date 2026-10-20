@@ -8,8 +8,6 @@ import {
 } from '@/sync/session-activity-timing';
 import { formatSessionActivityDuration } from './sessionActivityDurationFormat';
 
-/** One update per second: the readout is the animation, at 1 fps instead of 60. */
-const TICK_MS = 1000;
 
 /**
  * Elapsed time of a session's current turn, or of the turn that just finished.
@@ -30,7 +28,7 @@ export const SessionActivityDuration: React.FC<{
   const { t } = useI18n();
   const startedAt = useSessionActivityStartedAt(sessionId);
   const settledMs = useSessionSettledDurationMs(sessionId);
-  const now = useDurationTickerNow(running, TICK_MS);
+  const now = useDurationTickerNow(running);
 
   const durationMs = running ? Math.max(0, now - (startedAt ?? now)) : settledMs;
   if (durationMs === undefined) return null;
@@ -46,7 +44,7 @@ export const SessionActivityDuration: React.FC<{
         'shrink-0 tabular-nums',
         // The readout wears its dot's color, so the row reads as one signal:
         // primary while the turn runs, info once it is waiting to be read.
-        running ? 'text-primary' : 'text-[var(--status-info)]',
+        running ? 'text-[var(--status-info)]' : 'text-[var(--status-success)]',
         className,
       )}
       aria-label={description}

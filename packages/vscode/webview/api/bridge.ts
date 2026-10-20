@@ -27,6 +27,9 @@ function getVSCodeAPI(): VSCodeAPI {
   if (!vscodeApi) {
     const acquired = typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : undefined;
     vscodeApi = acquired ?? noopVSCodeApi;
+    // A reload or move between windows replaces the document without disposing
+    // its host panel. Retire the previous document's streams before any request.
+    vscodeApi.postMessage({ type: 'webview:ready' });
   }
   return vscodeApi;
 }
@@ -43,6 +46,18 @@ interface BridgeResponse {
   success: boolean;
   data?: unknown;
   error?: string;
+  code?: string;
+}
+
+/** A failed bridge request, with the extension's error code when it threw one. */
+export class BridgeRequestError extends Error {
+  readonly code: string | undefined;
+
+  constructor(message: string, code: string | undefined) {
+    super(message);
+    this.name = 'BridgeRequestError';
+    this.code = code;
+  }
 }
 
 const pendingRequests = new Map<string, {
@@ -75,7 +90,7 @@ window.addEventListener('message', (event: MessageEvent<BridgeResponse>) => {
     if (response.success) {
       pending.resolve(response.data);
     } else {
-      pending.reject(new Error(response.error || 'Unknown error'));
+      pending.reject(new BridgeRequestError(response.error || 'Unknown error', response.code));
     }
   }
 });

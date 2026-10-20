@@ -1,4 +1,4 @@
-import type { Part } from '@opencode-ai/sdk/v2';
+import type { Part } from '@/lib/opencode/model';
 
 import type { I18nKey, I18nParams } from '@/lib/i18n';
 import { readContextPart, type ContextPartPayload } from '@/lib/messages/contextParts';
@@ -39,9 +39,9 @@ const contextSummary = (payload: ContextPartPayload, t: Translate): string => {
         case 'browser-annotation':
             return t('chat.message.context.browserAnnotation', { page: payload.pageUrl });
         case 'pr-comment':
-            return t('chat.message.context.prComment', { label: payload.label });
+            return t(payload.provider === 'gitlab' ? 'chat.message.context.mrComment' : 'chat.message.context.prComment', { label: payload.label });
         case 'pr-check':
-            return t('chat.message.context.prCheck', { label: payload.label });
+            return t(payload.provider === 'gitlab' ? 'chat.message.context.mrCheck' : 'chat.message.context.prCheck', { label: payload.label });
         case 'file-quote': {
             const file = basename(payload.fileLabel);
             if (payload.startLine == null || payload.endLine == null) {
@@ -53,12 +53,15 @@ const contextSummary = (payload: ContextPartPayload, t: Translate): string => {
         }
         case 'chat-quote':
             return t('chat.message.context.chatQuote');
-        case 'github-issue':
+        case 'repository-issue':
             return `#${payload.number} ${payload.title}`;
-        case 'github-pr':
+        case 'change-request':
             return `#${payload.number} ${payload.title}`;
         case 'linear-issue':
             return `${payload.identifier} ${payload.title}`;
+        case 'guest-issue':
+        case 'guest-pr':
+            return `${payload.id} ${payload.title}`;
     }
 };
 
@@ -78,9 +81,11 @@ const contextBody = (payload: ContextPartPayload): string => {
         case 'file-quote':
         case 'chat-quote':
             return payload.quote;
-        case 'github-issue':
-        case 'github-pr':
+        case 'repository-issue':
+        case 'change-request':
         case 'linear-issue':
+        case 'guest-issue':
+        case 'guest-pr':
             return '';
     }
 };

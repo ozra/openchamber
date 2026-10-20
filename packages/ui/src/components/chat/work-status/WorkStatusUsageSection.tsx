@@ -18,6 +18,7 @@ import type { QuotaTone } from '@/lib/quota';
 import { useQuotaAutoRefresh, useQuotaStore } from '@/stores/useQuotaStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { useUsageProviderGroups } from '@/components/usage/usageGroups';
+import { UsageGiftResetButton } from '@/components/usage/UsageGiftResetButton';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { pickUsageHeadline } from './usageHeadline';
 import { runBackgroundNetworkTask } from '@/lib/background-network';
@@ -38,7 +39,6 @@ import { useReportWorkStatusPresence } from './presenceContext';
  * whatever happens to be running.
  */
 
-/** Work-status vocabulary for the shared quota tone (PRD-020 paces eligible windows). */
 const quotaToneToUsageTone = (tone: QuotaTone): 'default' | 'warning' | 'error' =>
   tone === 'critical' ? 'error' : tone === 'warn' ? 'warning' : 'default';
 
@@ -65,7 +65,7 @@ export const WorkStatusUsageSection: React.FC = () => {
   // so this is safe to run on every connection change.
   React.useEffect(() => {
     if (!isInitialized) return;
-    void runBackgroundNetworkTask(() => ensureQuotasLoadedForRuntime());
+    void runBackgroundNetworkTask(() => ensureQuotasLoadedForRuntime(), 'active-session');
   }, [ensureQuotasLoadedForRuntime, isInitialized]);
 
   React.useEffect(() => {
@@ -87,24 +87,23 @@ export const WorkStatusUsageSection: React.FC = () => {
   // showing some other provider's quota as if it were the active one.
   const headline = pickUsageHeadline(groups, currentProviderId);
   const headlineRow = headline?.row ?? null;
-  // Pace rides next to the used percentage itself; value-label rows (credits,
-  // spend) keep their tone but never gain a delta whose units would not match.
   const headlinePaceDelta = headlineRow && displayMode === 'usage' && !headlineRow.window.valueLabel
     ? computePaceDelta(headlineRow.window, now)
     : null;
-  const headlineMetric = headlineRow
+  const headlineMetric = headline
     ? formatQuotaValueLabel(
-      headlineRow.window.valueLabel,
-      displayMode === 'remaining' ? headlineRow.window.remainingPercent : headlineRow.window.usedPercent,
+      headline.row.window.valueLabel,
+      displayMode === 'remaining' ? headline.row.window.remainingPercent : headline.row.window.usedPercent,
     )
     : null;
+
   const headlineText = headlineMetric !== null && headlineMetric !== '-'
     ? headlinePaceDelta !== null
       ? `${headlineMetric} (${formatPaceDelta(headlinePaceDelta)})`
       : headlineMetric
     : null;
   const headlineUsedPercent = headlineRow?.window.usedPercent ?? null;
-  const headlineAria = headlineRow && headlinePaceDelta !== null && headlineUsedPercent !== null
+  const headlineAria = headlinePaceDelta !== null && headlineUsedPercent !== null
     ? formatPaceAriaLabel(t, headlineUsedPercent, headlinePaceDelta)
     : undefined;
 
@@ -145,7 +144,7 @@ export const WorkStatusUsageSection: React.FC = () => {
       {groups.map((group) => (
         <React.Fragment key={group.providerId}>
           <WorkStatusRow
-            leading={<ProviderLogo providerId={group.providerId} className="size-4 shrink-0" />}
+            leading={<ProviderLogo providerId={group.providerId} className="size-3.5 shrink-0" />}
             label={<span className="font-semibold text-foreground">{group.providerName}</span>}
             value={group.status && group.rows.length === 0 ? (
               <WorkStatusValue tone="muted">{group.status}</WorkStatusValue>
@@ -153,10 +152,7 @@ export const WorkStatusUsageSection: React.FC = () => {
           />
           {group.rows.map((row) => {
             const usedPercent = row.window.usedPercent;
-            // Pace is a percentage-point delta: it belongs next to the used
-            // percentage itself, so value-label rows (credits, spend) keep
-            // their tone but never gain a delta whose units would not match.
-            // `computePaceDelta` itself establishes finitude of every field.
+            // Value-label rows keep their tone without a percentage-point suffix.
             const paceDelta = displayMode === 'usage' && !row.window.valueLabel
               ? computePaceDelta(row.window, now)
               : null;
@@ -191,12 +187,15 @@ export const WorkStatusUsageSection: React.FC = () => {
                   </span>
                 )}
                 value={metricText === undefined ? undefined : (
-                  <WorkStatusValue
-                    tone={quotaToneToUsageTone(resolvePaceTone(row.window, now))}
-                    ariaLabel={paceAria}
-                  >
-                    {metricText}
-                  </WorkStatusValue>
+                  <span className="inline-flex items-center gap-1">
+                    <UsageGiftResetButton window={row.window} providerId={group.providerId} />
+                    <WorkStatusValue
+                      tone={quotaToneToUsageTone(resolvePaceTone(row.window, now))}
+                      ariaLabel={paceAria}
+                    >
+                      {metricText}
+                    </WorkStatusValue>
+                  </span>
                 )}
               />
             );

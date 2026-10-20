@@ -1,4 +1,5 @@
 import React from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { getMessageQueueKey, parseMessageQueueKey, useMessageQueueStore, type MessageQueueTarget, type QueuedMessage } from '@/stores/messageQueueStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useSelectionStore } from '@/sync/selection-store';
@@ -6,7 +7,8 @@ import { useConfigStore } from '@/stores/useConfigStore';
 import { useContextStore } from '@/stores/contextStore';
 import { useAutoReviewStore } from '@/stores/useAutoReviewStore';
 import { queuedContextToParts } from '@/components/chat/composer/submit/buildOutgoingMessage';
-import { getDirectoryState } from '@/sync/sync-refs';
+import { getAllSyncSessionMap, getDirectoryState } from '@/sync/sync-refs';
+import { hasActiveSubagent } from '@/sync/global-session-status';
 import { useDirectorySync } from '@/sync/sync-context';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
@@ -93,6 +95,7 @@ export const buildQueuedAutoSendPayload = (queue: QueuedMessage[]) => {
     agentMentionName: queued.agentMention,
     additionalParts: queuedContextToParts(queued.context ?? []),
     sendConfig: queued.sendConfig,
+    goal: queued.goal ?? null,
   };
 };
 
@@ -119,7 +122,7 @@ export const sendQueuedAutoSendPayload = (
     payload.additionalParts.length > 0 ? payload.additionalParts : undefined,
     resolved.variant,
     'normal',
-    { target, historySubmissions: payload.historySubmissions },
+    { target, historySubmissions: payload.historySubmissions, queuedGoal: payload.goal },
   );
 };
 
@@ -203,6 +206,18 @@ export const resolveQueuedSessionStatusType = (
   if (statusType === 'busy' || statusType === 'retry') {
     return statusType;
   }
+  // A queued message waits for the whole turn: a parent idles while a
+  // background subagent works and runs again when OpenCode hands the result
+  // back. Mirrors the server queue's subagent gate.
+  const activeSessionIds = new Set(Object.entries(state?.session_status ?? {})
+    .filter(([, status]) => status.type === 'busy' || status.type === 'retry')
+    .map(([id]) => id));
+  const sessionsById = getAllSyncSessionMap();
+  const subagentRunning = activeSessionIds.size > 0
+    && hasActiveSubagent(sessionId, activeSessionIds, (id) => sessionsById.get(id)?.parentID);
+  if (subagentRunning) {
+    return 'busy';
+  }
   const sessionMessages = state?.message?.[sessionId];
   const lastMessage = sessionMessages && sessionMessages.length > 0
     ? sessionMessages[sessionMessages.length - 1]
@@ -221,11 +236,28 @@ export function useQueuedMessageAutoSend(enabledOrOptions?: boolean | { enabled?
   const queuedMessages = useMessageQueueStore((state) => state.queuedMessages);
   const autoReviewRuns = useAutoReviewStore((state) => state.runsByOriginalSessionID);
   const sessionStatusRecord = useDirectorySync((state) => state.session_status);
+  const sessions = useDirectorySync((state) => state.session);
+  const currentDirectory = useDirectoryStore((state) => state.currentDirectory);
+  const queuedSessionIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    for (const key of Object.keys(queuedMessages)) {
+      const target = parseMessageQueueKey(key);
+      if (target && target.runtimeKey === getRuntimeKey() && target.directory === currentDirectory) ids.add(target.sessionId);
+    }
+    return [...ids].sort();
+  }, [currentDirectory, queuedMessages]);
   // Message completion clears the in-flight fallback in
   // resolveQueuedSessionStatusType; subscribe so the queue drains the moment
   // the trailing assistant message completes even if status events were missed.
-  const sessionMessages = useDirectorySync((state) => state.message);
-  const currentDirectory = useDirectoryStore((state) => state.currentDirectory);
+  // Only the trailing message of a queued session matters: selecting the whole
+  // message map would rerun this effect on every transcript change anywhere.
+  const trailingMessageSignature = useDirectorySync(useShallow((state) => queuedSessionIds.map((sessionId) => {
+    const messages = state.message[sessionId];
+    const last = messages?.[messages.length - 1];
+    if (!last) return '';
+    const completed = last.role !== 'assistant' || last.time.completed !== undefined;
+    return `${last.id}:${completed}`;
+  })));
 
   const inFlightSessionsRef = React.useRef<Set<string>>(new Set());
   const sendFailuresRef = React.useRef<Map<string, QueuedAutoSendFailure>>(new Map());
@@ -362,5 +394,5 @@ export function useQueuedMessageAutoSend(enabledOrOptions?: boolean | { enabled?
     });
 
     previousStatusRef.current = nextStatusMap;
-  }, [enabled, queuedMessages, sessionStatusRecord, sessionMessages, autoReviewRuns, currentDirectory, retryTick, retryScheduler]);
+  }, [enabled, queuedMessages, sessionStatusRecord, sessions, trailingMessageSignature, autoReviewRuns, currentDirectory, retryTick, retryScheduler]);
 }

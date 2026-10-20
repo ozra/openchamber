@@ -23,7 +23,7 @@
 
 import React from 'react';
 import { history, historyKeymap, standardKeymap } from '@codemirror/commands';
-import { Compartment, EditorState, Prec, type Extension } from '@codemirror/state';
+import { Annotation, Compartment, EditorState, Prec, type Extension } from '@codemirror/state';
 import {
     EditorView,
     drawSelection,
@@ -36,11 +36,15 @@ import { cn } from '@/lib/utils';
 import type { ComposerLanguageContext } from '../language/tokenize';
 import type { ComposerAutoCorrect } from './autocorrect';
 import { composerLanguage, setLanguageContext } from './composerLanguage';
+import { composerBidi } from './bidi';
 import { replaceWithCaret } from './documentEdits';
 import type { ComposerEditorViewStore } from './viewStore';
+import { ComposerEditorView } from './ComposerEditorView';
 import { composerEditorTheme, composerSelectionExtension } from './theme';
 import { handleComposerHostMouseDown } from './hostMouseDown';
+import { getComposerHeightLimit, isComposerContentCapped } from './heightLimit';
 import { restoreDeferredEnterModifiers } from '../keyboardPolicy';
+import { timerCaretBlink } from '@/lib/codemirror/caretBlink';
 
 export interface ComposerSelection {
     start: number;
@@ -54,6 +58,12 @@ export interface ComposerChange {
     fromPaste: boolean;
     /** The text this edit inserted, empty for deletions. */
     insertedText: string;
+    /**
+     * True when the edit only applied a new `value` prop: text the app put
+     * there (a restored draft, a prepared prompt), not anything the user typed
+     * or pasted. Callers must not open pickers for it.
+     */
+    fromValueProp: boolean;
 }
 
 export interface ComposerEditorHandle {
@@ -85,6 +95,7 @@ export interface ComposerEditorProps {
      * message history and send.
      */
     onKeyDown?: (event: KeyboardEvent) => boolean;
+    onKeyUp?: (event: KeyboardEvent) => void;
     onFocus?: () => void;
     onBlur?: () => void;
     onPaste?: (event: ClipboardEvent) => void;
@@ -115,6 +126,13 @@ export interface ComposerEditorProps {
     className?: string;
     contentClassName?: string;
     /**
+     * Value of the host's `data-chat-input` attribute. The default `"true"`
+     * marks the composer's prompt editor for global helpers (`focusChatInput`,
+     * shortcut guards); a second editor in the same column — the mobile
+     * comment editor — passes its own marker so those helpers skip it.
+     */
+    dataChatInput?: string;
+    /**
      * Keeps the underlying view alive across unmounts. Supply one from a parent
      * that outlives the swap; without it the view is built and destroyed with
      * the component, which is correct but expensive on an interaction path.
@@ -123,7 +141,6 @@ export interface ComposerEditorProps {
     'aria-label'?: string;
     'data-testid'?: string;
 }
-
 
 /**
  * The text inserted by a transaction, used to tell a typed `@` from a pasted
@@ -157,7 +174,12 @@ function isDeferredSyntheticEvent(event: KeyboardEvent): boolean {
 const editableCompartment = new Compartment();
 const placeholderCompartment = new Compartment();
 
-export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEditorProps>(
+/** Marks the transaction that writes a changed `value` prop into the editor. */
+const valuePropWrite = Annotation.define<true>();
+
+// Memoized: the view is built once and reads its handlers through a ref, so a
+// parent render with equal props has nothing to tell it.
+export const ComposerEditor = React.memo(React.forwardRef<ComposerEditorHandle, ComposerEditorProps>(
     function ComposerEditor(props, ref) {
         const {
             value,
@@ -241,7 +263,7 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
                 },
             }];
 
-            const view = new EditorView({
+            const view = new ComposerEditorView({
                 state: EditorState.create({
                     doc: handlersRef.current.value,
                     extensions: [
@@ -252,14 +274,27 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
                         // makes CodeMirror enforce cursor association on the
                         // native selection, which iOS answers with severe lag.
                         drawSelection(),
+                        // Blinks the drawn caret from a timer; CodeMirror's
+                        // CSS blink keeps the compositor busy every frame.
+                        timerCaretBlink(),
                         composerSelectionExtension(),
                         EditorView.lineWrapping,
                         // Highest precedence: the composer's own keys must win
                         // over CodeMirror's defaults (Enter sends, ArrowUp
                         // walks history, Escape closes a picker).
                         Prec.highest(keymap.of(interceptKeys)),
-                        keymap.of([...standardKeymap, ...historyKeymap]),
+                        keymap.of([
+                            // At a document boundary these commands return false.
+                            // Chromium's native page movement can then scroll
+                            // hidden-overflow ancestors of the empty placeholder.
+                            ...standardKeymap.map((binding) =>
+                                binding.key === 'PageUp' || binding.key === 'PageDown'
+                                    ? { ...binding, preventDefault: true }
+                                    : binding),
+                            ...historyKeymap,
+                        ]),
                         composerLanguage(handlersRef.current.languageContext),
+                        composerBidi,
                         editableCompartment.of(
                             EditorView.editable.of(handlersRef.current.editable ?? true),
                         ),
@@ -284,6 +319,9 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
                                     selection,
                                     fromPaste,
                                     insertedText,
+                                    fromValueProp: update.transactions.every(
+                                        (transaction) => !transaction.docChanged || transaction.annotation(valuePropWrite) === true,
+                                    ),
                                 });
                                 return;
                             }
@@ -293,6 +331,7 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
                             }
                         }),
                         EditorView.domEventHandlers({
+                            keyup: (event) => { handlersRef.current.onKeyUp?.(event); return false; },
                             focus: () => { handlersRef.current.onFocus?.(); return false; },
                             blur: () => { handlersRef.current.onBlur?.(); return false; },
                             paste: (event) => { handlersRef.current.onPaste?.(event); return false; },
@@ -344,7 +383,7 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
             };
             // Created once: every changing input is applied through a
             // dispatch below rather than by rebuilding the view.
-            // eslint-disable-next-line react-hooks/exhaustive-deps
+            // oxlint-disable-next-line react-hooks/exhaustive-deps
         }, []);
 
         // Controlled value: only write back when the prop and the document
@@ -366,7 +405,10 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
             // keeping the old caret instead left it stranded before the
             // inserted text, and the next insertion or keystroke landed inside
             // the previous one.
-            view.dispatch(replaceWithCaret(view.state, 0, current.length, value));
+            view.dispatch({
+                ...replaceWithCaret(view.state, 0, current.length, value),
+                annotations: valuePropWrite.of(true),
+            });
             // A large insert can push the caret below the fold, and a
             // transaction-time `scrollIntoView` cannot reach it: wrapped-line
             // heights are still estimates during the update, and the
@@ -414,6 +456,7 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
             // window while the rest of the surface sits empty.
             if (fillContainer) {
                 view.scrollDOM.style.maxHeight = '';
+                view.scrollDOM.style.overflowY = '';
                 return;
             }
 
@@ -435,17 +478,30 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
                     getComputedStyle(view.contentDOM).lineHeight || '',
                 );
                 if (!Number.isFinite(lineHeight) || lineHeight <= 0) return;
-                let cap = lineHeight * maxLines;
-                if (boundEl && branch) {
-                    const chrome = branch.offsetHeight - view.scrollDOM.offsetHeight;
-                    const available = boundEl.clientHeight - chrome - boundGapPx;
-                    if (available > 0) cap = Math.min(cap, available);
-                }
+                const cap = getComposerHeightLimit({
+                    maxLinesHeight: lineHeight * maxLines,
+                    boundHeight: boundEl?.clientHeight,
+                    surroundingHeight: branch
+                        ? branch.offsetHeight - view.scrollDOM.offsetHeight
+                        : undefined,
+                    boundGapPx,
+                });
                 const next = `${cap}px`;
                 // The scroller growing re-fires the observer with an unchanged
                 // result; writing only on change keeps that loop silent.
                 if (view.scrollDOM.style.maxHeight !== next) {
                     view.scrollDOM.style.maxHeight = next;
+                }
+                // Scroll only once the text is past the cap; below it, a
+                // sub-line overflow would draw a scrollbar with nothing to
+                // scroll (#4004).
+                const overflowY = isComposerContentCapped(
+                    view.contentDOM.getBoundingClientRect().height,
+                    cap,
+                    lineHeight,
+                ) ? 'auto' : 'hidden';
+                if (view.scrollDOM.style.overflowY !== overflowY) {
+                    view.scrollDOM.style.overflowY = overflowY;
                 }
             };
 
@@ -453,6 +509,9 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
             if (typeof ResizeObserver === 'undefined') return;
             const observer = new ResizeObserver(applyLimit);
             observer.observe(host);
+            // Past the cap the host stops growing, so the content is what
+            // reports the text crossing it.
+            observer.observe(view.contentDOM);
             if (branch) observer.observe(branch);
             if (boundEl) observer.observe(boundEl);
             return () => observer.disconnect();
@@ -553,7 +612,7 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
             <div
                 ref={hostRef}
                 data-testid={props['data-testid']}
-                data-chat-input="true"
+                data-chat-input={props.dataChatInput ?? 'true'}
                 onMouseDown={handleHostMouseDown}
                 className={cn(
                     'composer-editor w-full',
@@ -567,7 +626,7 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
             />
         );
     },
-);
+));
 
 function readSelection(state: EditorState): ComposerSelection {
     const range = state.selection.main;

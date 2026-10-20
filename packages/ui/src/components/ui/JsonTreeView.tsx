@@ -1,4 +1,5 @@
 import React from 'react';
+import stripJsonComments from 'strip-json-comments';
 
 import { Button } from '@/components/ui/button';
 import { Icon } from "@/components/icon/Icon";
@@ -7,6 +8,7 @@ import { useI18n } from '@/lib/i18n';
 
 interface JsonTreeViewProps {
   jsonString: string;
+  format?: 'json' | 'jsonc';
   className?: string;
   maxHeight?: string;
   initiallyExpandedDepth?: number;
@@ -14,6 +16,7 @@ interface JsonTreeViewProps {
 
 const JsonTreeView = React.memo(function JsonTreeView({
   jsonString,
+  format = 'json',
   className,
   maxHeight = '100%',
   initiallyExpandedDepth = 2,
@@ -29,14 +32,17 @@ const JsonTreeView = React.memo(function JsonTreeView({
         setParseError(t('jsonTreeView.error.emptyJson'));
         return null;
       }
-      const parsed = JSON.parse(trimmed);
+      const source = format === 'jsonc'
+        ? stripJsonComments(trimmed, { trailingCommas: true })
+        : trimmed;
+      const parsed = JSON.parse(source);
       setParseError(null);
       return parsed;
     } catch (err) {
       setParseError(err instanceof Error ? err.message : t('jsonTreeView.error.invalidJson'));
       return null;
     }
-  }, [jsonString, t]);
+  }, [jsonString, format, t]);
 
   const handleExpandAll = React.useCallback(() => {
     viewerRef.current?.expandAll();
@@ -49,9 +55,9 @@ const JsonTreeView = React.memo(function JsonTreeView({
   if (parseError) {
     return (
       <div className={className}>
-        <div className="rounded-md border border-[var(--interactive-border)] bg-[var(--syntax-base-background)] p-4">
-          <div className="mb-1 font-medium text-[var(--surface-foreground)]">{t('jsonTreeView.error.invalidJsonTitle')}</div>
-          <div className="font-mono text-xs text-[var(--surface-mutedForeground)]">{parseError}</div>
+        <div className="oc-surface-code rounded-md border border-[var(--interactive-border)] bg-[var(--syntax-background)] p-4">
+          <div className="mb-1 font-medium text-foreground">{t('jsonTreeView.error.invalidJsonTitle')}</div>
+          <div className="font-mono text-xs text-muted-foreground">{parseError}</div>
         </div>
       </div>
     );
@@ -84,7 +90,7 @@ const JsonTreeView = React.memo(function JsonTreeView({
         </Button>
       </div>
       <div
-        className="bg-[var(--syntax-base-background)] py-1"
+        className="oc-surface-code bg-[var(--syntax-background)] py-1"
         style={{ maxHeight, overflow: 'auto' }}
       >
         <JsonTreeViewer

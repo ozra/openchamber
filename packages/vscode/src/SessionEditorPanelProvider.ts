@@ -110,10 +110,33 @@ export class SessionEditorPanelProvider {
     );
   }
 
-  public createOrShowNewSession(): void {
+  public createOrShowNewSession(directory?: string): void {
+    this._openDraftPanel(t('New Session'), undefined, directory);
+  }
+
+  /**
+   * A new-session tab whose draft opens in "Run on several models" mode: the
+   * wide place to set up a parallel run. Runs themselves open wherever the
+   * chat is, like any session.
+   */
+  public createOrShowParallelDraft(directory?: string): void {
+    this._openDraftPanel(t('Run on several models'), 'parallel', directory);
+  }
+
+  private _openDraftPanel(title: string, initialComposer: 'parallel' | undefined, directory?: string): void {
+    // Without an open workspace folder there is no directory to start the
+    // session against; opening a draft would fall back to the last session's
+    // directory in shared UI state (the bug this fixes). Mirror the sidebar
+    // flow's guard and tell the user instead.
+    const firstFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!firstFolder) {
+      vscode.window.showInformationMessage('OpenChamber: No folder is open. Open a folder to start a new session.');
+      return;
+    }
+
     // Generate unique panel ID for new session drafts
     const panelId = `new_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    this._createPanel(panelId, t('New Session'), null);
+    this._createPanel(panelId, title, null, initialComposer, directory);
   }
 
   public createOrShow(sessionId: string, title?: string): void {
@@ -133,7 +156,7 @@ export class SessionEditorPanelProvider {
     this._createPanel(sessionId, sessionTitle, sessionId);
   }
 
-  private _createPanel(panelId: string, title: string, initialSessionId: string | null): void {
+  private _createPanel(panelId: string, title: string, initialSessionId: string | null, initialComposer?: 'parallel', directory?: string): void {
     const distUri = vscode.Uri.joinPath(this._extensionUri, 'dist');
 
     const panel = vscode.window.createWebviewPanel(
@@ -163,7 +186,7 @@ export class SessionEditorPanelProvider {
     this._panels.set(panelId, state);
     this._lastActivePanelId = panelId;
 
-    panel.webview.html = this._getHtmlForWebview(panel.webview, initialSessionId);
+    panel.webview.html = this._getHtmlForWebview(panel.webview, initialSessionId, initialComposer, directory);
 
     void this.updateTheme(vscode.window.activeColorTheme.kind);
     this._sendCachedStateToPanel(state);
@@ -180,9 +203,18 @@ export class SessionEditorPanelProvider {
       if (event.webviewPanel.active) {
         this._lastActivePanelId = panelId;
       }
+      this._postViewerState(state);
     }, null, this._context.subscriptions);
 
     panel.webview.onDidReceiveMessage(async (message: BridgeRequest) => {
+      if (message.type === 'webview:ready') {
+        for (const controller of state.sseStreams.values()) {
+          controller.abort();
+        }
+        state.sseStreams.clear();
+        this._sendCachedStateToPanel(state);
+      }
+
       // Any inbound message proves the webview script is running, which is the
       // only readiness signal this panel has. Flush whatever was held for it.
       state.webviewReady = true;
@@ -193,6 +225,8 @@ export class SessionEditorPanelProvider {
           payload: { ...pending, targetSessionId: state.sessionId ?? undefined },
         });
       }
+
+      if (message.type === 'webview:ready') return;
 
       // Editor comment threads mirror the composer's drafts, so the webview
       // reports every change. One-way notification, no response expected.
@@ -295,14 +329,26 @@ export class SessionEditorPanelProvider {
     }
   }
 
-  public notifyWindowFocusChanged(focused: boolean): void {
+  /** Tells each panel's webview whether the user can see it: VS Code focused and the panel shown. */
+  public notifyViewerStateChanged(): void {
     for (const entry of this._panels.values()) {
-      entry.panel.webview.postMessage({
-        type: 'command',
-        command: 'windowFocusChanged',
-        payload: { focused },
-      });
+      this._postViewerState(entry);
     }
+  }
+
+  public hasVisiblePanel(): boolean {
+    for (const entry of this._panels.values()) {
+      if (entry.panel.visible) return true;
+    }
+    return false;
+  }
+
+  private _postViewerState(entry: SessionPanelState): void {
+    entry.panel.webview.postMessage({
+      type: 'command',
+      command: 'viewerStateChanged',
+      payload: { windowFocused: vscode.window.state.focused, surfaceVisible: entry.panel.visible },
+    });
   }
 
   private _getActivePanelEntry(): SessionPanelState | null {
@@ -448,11 +494,7 @@ export class SessionEditorPanelProvider {
       status: this._cachedStatus,
       error: this._cachedError,
     });
-    entry.panel.webview.postMessage({
-      type: 'command',
-      command: 'windowFocusChanged',
-      payload: { focused: vscode.window.state.focused },
-    });
+    this._postViewerState(entry);
   }
 
   private _postCommandToPanels(command: string, payload: unknown): void {
@@ -648,9 +690,9 @@ export class SessionEditorPanelProvider {
     return { id, type, success: true, data: { stopped: true } };
   }
 
-  private _getHtmlForWebview(webview: vscode.Webview, sessionId: string | null) {
+  private _getHtmlForWebview(webview: vscode.Webview, sessionId: string | null, initialComposer?: 'parallel', directory?: string) {
     const workspaceFolder = normalizeWindowsDriveLetter(
-      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || ''
+      directory ?? (vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '')
     );
     const workspaceFolders = resolveWorkspaceFolders(vscode.workspace.workspaceFolders ?? []);
     const initialStatus = this._cachedStatus;
@@ -663,8 +705,8 @@ export class SessionEditorPanelProvider {
       workspaceFolders,
       initialStatus,
       cliAvailable,
-      panelType: 'chat',
       initialSessionId: sessionId ?? undefined,
+      initialComposer,
       viewMode: 'editor',
       extensionVersion: String(this._context.extension?.packageJSON?.version || ''),
       devServerUrl: this._webviewDevServerUrl,

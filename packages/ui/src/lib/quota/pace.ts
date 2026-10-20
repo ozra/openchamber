@@ -20,7 +20,6 @@ import { isFiniteNumber, resolveUsageTone, type QuotaTone } from './utils';
 const WINDOW_START_SKEW_MS = 5_000;
 
 /** Close enough to the second for a live pace readout. */
-const PACE_TICK_MS = 1_000;
 
 /**
  * Percentage-point difference between usage and elapsed time, or null when the
@@ -130,5 +129,5 @@ export const formatPaceAriaLabel = (
  * waiting for the next tick.
  */
 export const useQuotaPaceNow = (enabled: boolean): number => {
-  return useDurationTickerNow(enabled, PACE_TICK_MS);
+  return useDurationTickerNow(enabled);
 };

@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import { mkdtemp, rm, readFile, writeFile } from 'fs/promises';
 import { createProjectConfigRuntime } from './project-config.js';
+import { createProjectIdFromPath } from './project-id.js';
 
 const createRuntime = async () => {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'oc-scheduled-project-config-'));
@@ -22,6 +23,19 @@ const createRuntime = async () => {
 };
 
 describe('project-config runtime', () => {
+  it('round-trips target tasks, terminal states and agent-only overrides without changing legacy model requirements', async () => {
+    const { runtime, cleanup } = await createRuntime();
+    try {
+      const input = { name: 'Reuse', enabled: true, targetSessionId: 'ses_target', schedule: { kind: 'daily', time: '09:00' }, execution: { prompt: 'Continue', agent: 'plan' } };
+      const saved = await runtime.upsertScheduledTask('project-test', input);
+      for (const lastStatus of ['queued', 'sent', 'skipped', 'failed', 'cancelled']) {
+        await runtime.updateScheduledTaskState('project-test', saved.task.id, { lastStatus, lastSessionId: 'ses_target' });
+        expect((await runtime.listScheduledTasks('project-test'))[0]).toMatchObject({ targetSessionId: 'ses_target', state: { lastStatus, lastSessionId: 'ses_target' } });
+      }
+      await expect(runtime.upsertScheduledTask('project-test', { ...input, targetSessionId: '../bad' })).rejects.toThrow('targetSessionId is invalid');
+      await expect(runtime.upsertScheduledTask('project-test', { ...input, targetSessionId: '' })).rejects.toThrow('execution.providerID is required');
+    } finally { await cleanup(); }
+  });
   it('creates and persists a scheduled task', async () => {
     const { runtime, cleanup } = await createRuntime();
     try {
@@ -47,6 +61,23 @@ describe('project-config runtime', () => {
       expect(reloaded[0].name).toBe('Nightly digest');
       expect(reloaded[0].schedule.timezone).toBe('UTC');
       expect(reloaded[0].schedule.times).toEqual(['09:30']);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('accepts a task that follows the session defaults without a model, and still needs one when pinned', async () => {
+    const { runtime, cleanup } = await createRuntime();
+    const task = (execution) => ({
+      name: 'Follow defaults',
+      enabled: true,
+      schedule: { kind: 'daily', time: '09:30', timezone: 'UTC' },
+      execution: { prompt: 'Summarize', ...execution },
+    });
+    try {
+      const result = await runtime.upsertScheduledTask('project-test', task({ useDefaults: true }));
+      expect(result.task.execution).toEqual({ prompt: 'Summarize', useDefaults: true });
+      await expect(runtime.upsertScheduledTask('project-test', task({}))).rejects.toThrow('execution.providerID is required');
     } finally {
       await cleanup();
     }
@@ -169,6 +200,102 @@ describe('project-config runtime', () => {
       expect(result.task.schedule.date).toBe('2026-04-20');
       expect(result.task.schedule.time).toBe('13:45');
       expect(result.task.schedule.timezone).toBe('Europe/Kyiv');
+    } finally {
+      await cleanup();
+    }
+  });
+});
+
+describe('project-config file naming', () => {
+  const nightly = {
+    name: 'nightly',
+    enabled: true,
+    schedule: { kind: 'daily', time: '09:00', timezone: 'UTC' },
+    execution: { prompt: 'run', providerID: 'openai', modelID: 'gpt-4.1' },
+  };
+
+  it('names the file by the id while the id fits a file name', async () => {
+    const { runtime, tempRoot, cleanup } = await createRuntime();
+    try {
+      const projectID = createProjectIdFromPath('/Users/someone/projects/demo');
+      expect(runtime.resolveProjectConfigPath(projectID)).toBe(path.join(tempRoot, `${projectID}.json`));
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('stores a project whose path is too long for a file name under a bounded name', async () => {
+    const { runtime, tempRoot, cleanup } = await createRuntime();
+    try {
+      // ~190 characters, like a scratchpad checkout nested under a worktree;
+      // the base64url id is longer than the 255-byte file name limit allows.
+      const projectPath = `/private/tmp/claude-501/${'segment-'.repeat(18)}/scratchpad/evidence/demo-repo`;
+      expect(projectPath.length).toBeGreaterThan(180);
+      const projectID = createProjectIdFromPath(projectPath);
+      expect(projectID.length).toBeGreaterThan(240);
+
+      const filePath = runtime.resolveProjectConfigPath(projectID);
+      const fileName = path.basename(filePath);
+      expect(path.dirname(filePath)).toBe(tempRoot);
+      expect(fileName.startsWith('path_sha256_')).toBe(true);
+      expect(fileName.length).toBeLessThan(100);
+      // The same id always maps to the same file.
+      expect(runtime.resolveProjectConfigPath(projectID)).toBe(filePath);
+
+      // The whole write path (lock file, temp file, rename) works on a real filesystem.
+      const created = await runtime.upsertScheduledTask(projectID, nightly);
+      expect(created.created).toBe(true);
+      const setup = await runtime.updateProjectSetup(projectID, { setupWorktree: ['bun install'] });
+      expect(setup.setupWorktree).toEqual(['bun install']);
+
+      const raw = JSON.parse(await readFile(filePath, 'utf8'));
+      expect(raw.scheduledTasks).toHaveLength(1);
+      expect(raw['setup-worktree']).toEqual(['bun install']);
+      expect(await runtime.listScheduledTasks(projectID)).toHaveLength(1);
+      expect((await runtime.readProjectSetup(projectID)).setupWorktree).toEqual(['bun install']);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('reads a long id from its pre-bound file name and moves it on the next write', async () => {
+    const { runtime, tempRoot, cleanup } = await createRuntime();
+    try {
+      // Long enough for the bounded name, short enough that an older build
+      // could still have written `<id>.json` on this filesystem.
+      const projectID = `path_${'a'.repeat(200)}`;
+      const legacyPath = path.join(tempRoot, `${projectID}.json`);
+      const currentPath = runtime.resolveProjectConfigPath(projectID);
+      expect(currentPath).not.toBe(legacyPath);
+      await writeFile(legacyPath, JSON.stringify({
+        version: 1,
+        scheduledTasks: [{ id: 'task-legacy', ...nightly, state: { createdAt: 1, updatedAt: 2, lastStatus: 'idle' } }],
+        projectNotes: 'keep me',
+      }), 'utf8');
+
+      const tasks = await runtime.listScheduledTasks(projectID);
+      expect(tasks.map((task) => task.id)).toEqual(['task-legacy']);
+
+      await runtime.upsertScheduledTask(projectID, { ...nightly, name: 'weekly digest' });
+
+      const raw = JSON.parse(await readFile(currentPath, 'utf8'));
+      expect(raw.scheduledTasks.map((task) => task.id)).toEqual(['task-legacy', 'task-fixed-id']);
+      expect(raw.projectNotes).toBe('keep me');
+      await expect(readFile(legacyPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+      expect((await runtime.listScheduledTasks(projectID)).map((task) => task.name)).toEqual(['nightly', 'weekly digest']);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('treats a malformed pre-bound file as a failure, not as an empty project', async () => {
+    const { runtime, tempRoot, cleanup } = await createRuntime();
+    try {
+      const projectID = `path_${'b'.repeat(200)}`;
+      await writeFile(path.join(tempRoot, `${projectID}.json`), '{ not json', 'utf8');
+      await expect(runtime.listScheduledTasks(projectID)).rejects.toThrow();
+      await expect(runtime.upsertScheduledTask(projectID, nightly)).rejects.toThrow();
+      await expect(readFile(runtime.resolveProjectConfigPath(projectID), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     } finally {
       await cleanup();
     }

@@ -15,8 +15,11 @@
  */
 
 import { z } from 'zod';
-import type { TextPart } from '@opencode-ai/sdk/v2';
+import type { SourceControlProvider } from '@/lib/api/types';
+import type { JsonValue } from '@openchamber/sdk';
+import type { Metadata } from '@/lib/opencode/model';
 import type { InlineCommentDraft } from '@/stores/useInlineCommentDraftStore';
+import { chatQuoteAnchorSchema, type ChatQuoteAnchor } from '@/lib/chatQuoteAnchor';
 import { appendTerminalContexts } from './terminalContext';
 
 export const CONTEXT_METADATA_KEY = 'openchamberContext';
@@ -56,6 +59,8 @@ type PrCommentContext = {
     label: string;
     body: string;
     text: string;
+    /** Absent on messages from before GitLab: those are GitHub. */
+    provider?: SourceControlProvider;
 };
 
 type PrCheckContext = {
@@ -63,10 +68,14 @@ type PrCheckContext = {
     label: string;
     output: string;
     text: string;
+    /** Absent on messages from before GitLab: those are GitHub. */
+    provider?: SourceControlProvider;
 };
 
-type GitHubIssueContext = {
-    kind: 'github-issue';
+type RepositoryIssueContext = {
+    kind: 'repository-issue';
+    /** Absent on messages from before GitLab: those are GitHub. */
+    provider?: SourceControlProvider;
     number: number;
     title: string;
     url: string;
@@ -86,12 +95,16 @@ type ChatQuoteContext = {
     kind: 'chat-quote';
     /** The message the quote came from, when known. */
     messageId?: string;
+    /** Where the quote sits in that message's rendered text, when captured. */
+    anchor?: ChatQuoteAnchor;
     quote: string;
     text: string;
 };
 
-type GitHubPrContext = {
-    kind: 'github-pr';
+type ChangeRequestContext = {
+    kind: 'change-request';
+    /** Absent on messages written before providers other than GitHub existed. */
+    provider?: SourceControlProvider;
     number: number;
     title: string;
     url: string;
@@ -104,6 +117,25 @@ type LinearIssueContext = {
     url: string;
 };
 
+type GuestIssueContext = {
+    kind: 'guest-issue';
+    providerId: string;
+    id: string;
+    title: string;
+    url: string;
+    /** Opaque guest payload; stored for the round trip back to the guest, never rendered. */
+    data?: JsonValue;
+};
+
+type GuestPrContext = {
+    kind: 'guest-pr';
+    providerId: string;
+    id: string;
+    title: string;
+    url: string;
+    data?: JsonValue;
+};
+
 export type ContextPartPayload =
     | CodeCommentContext
     | TerminalContextPayload
@@ -112,9 +144,11 @@ export type ContextPartPayload =
     | PrCheckContext
     | FileQuoteContext
     | ChatQuoteContext
-    | GitHubIssueContext
-    | GitHubPrContext
-    | LinearIssueContext;
+    | RepositoryIssueContext
+    | ChangeRequestContext
+    | LinearIssueContext
+    | GuestIssueContext
+    | GuestPrContext;
 
 type OpenCodeCommentMetadata = {
     path: string;
@@ -129,9 +163,13 @@ export type ContextPartMetadata = {
     [OPENCODE_COMMENT_METADATA_KEY]?: OpenCodeCommentMetadata;
 };
 
+/**
+ * One context item as it goes on the wire: a synthetic message whose `text` is
+ * what the model reads and whose metadata carries the same information
+ * structured, so the timeline can render it as a dedicated block.
+ */
 export type ContextPart = {
     text: string;
-    synthetic: true;
     metadata: ContextPartMetadata;
 };
 
@@ -158,7 +196,7 @@ export function formatContextText(payload: ContextPartPayload): string {
         case 'browser-annotation':
             return payload.text ? `${payload.prompt}\n\n${payload.text}` : payload.prompt;
         case 'pr-comment':
-            return `Attached GitHub PR comment (${payload.label}):\n\n${payload.body}${payload.text ? `\n\n${payload.text}` : ''}`;
+            return `Attached ${payload.provider === 'gitlab' ? 'GitLab merge request' : 'GitHub PR'} comment (${payload.label}):\n\n${payload.body}${payload.text ? `\n\n${payload.text}` : ''}`;
         case 'file-quote': {
             const location = payload.startLine != null && payload.endLine != null
                 ? ` lines ${payload.startLine}-${payload.endLine}`
@@ -171,21 +209,22 @@ export function formatContextText(payload: ContextPartPayload): string {
             return `Comment on this fragment of an earlier message in this conversation:\n${quoted}${payload.text ? `\n\n${payload.text}` : ''}`;
         }
         case 'pr-check':
-            return `Attached failed GitHub PR check (${payload.label}):\n\`\`\`\n${payload.output}\n\`\`\`${payload.text ? `\n\n${payload.text}` : ''}`;
-        case 'github-issue':
-        case 'github-pr':
+            return `Attached failed ${payload.provider === 'gitlab' ? 'GitLab merge request pipeline job' : 'GitHub PR check'} (${payload.label}):\n\`\`\`\n${payload.output}\n\`\`\`${payload.text ? `\n\n${payload.text}` : ''}`;
+        case 'repository-issue':
+        case 'change-request':
         case 'linear-issue':
-            // Linked issues/PRs carry server-fetched context text built by
-            // their pickers; there is no default text to derive here.
+        case 'guest-issue':
+        case 'guest-pr':
+            // Linked issues/PRs carry picker-built context text;
+            // there is no default text to derive here.
             return '';
     }
 }
 
 /**
  * Build the synthetic part for one context payload. `text` overrides the
- * derived text; github-issue/github-pr/linear-issue payloads require it
- * because their model-facing context is fetched by the picker, not derived
- * from metadata.
+ * derived text; repository-issue/change-request payloads require it because their
+ * model-facing context is fetched by the picker, not derived from metadata.
  */
 export function createContextPart(payload: ContextPartPayload, text?: string): ContextPart {
     const resolvedText = text ?? formatContextText(payload);
@@ -206,7 +245,6 @@ export function createContextPart(payload: ContextPartPayload, text?: string): C
     }
     return {
         text: resolvedText,
-        synthetic: true,
         metadata,
     };
 }
@@ -231,9 +269,9 @@ export function contextPayloadFromDraft(draft: InlineCommentDraft): ContextPartP
                 text: draft.text,
             };
         case 'pr-comment':
-            return { kind: 'pr-comment', label: draft.fileLabel, body: draft.code, text: draft.text };
+            return { kind: 'pr-comment', label: draft.fileLabel, body: draft.code, text: draft.text, ...(draft.provider ? { provider: draft.provider } : {}) };
         case 'pr-check':
-            return { kind: 'pr-check', label: draft.fileLabel, output: draft.code, text: draft.text };
+            return { kind: 'pr-check', label: draft.fileLabel, output: draft.code, text: draft.text, ...(draft.provider ? { provider: draft.provider } : {}) };
         case 'file-quote': {
             const payload: FileQuoteContext = { kind: 'file-quote', fileLabel: draft.fileLabel, quote: draft.code, text: draft.text };
             if (draft.startLine > 0 && draft.endLine > 0) {
@@ -245,6 +283,7 @@ export function contextPayloadFromDraft(draft: InlineCommentDraft): ContextPartP
         case 'chat-quote': {
             const payload: ChatQuoteContext = { kind: 'chat-quote', quote: draft.code, text: draft.text };
             if (draft.fileLabel) payload.messageId = draft.fileLabel;
+            if (draft.anchor) payload.anchor = draft.anchor;
             return payload;
         }
         case 'diff':
@@ -270,7 +309,7 @@ export function contextPayloadFromDraft(draft: InlineCommentDraft): ContextPartP
 // Read-back: parsing part metadata at the display boundary
 // ---------------------------------------------------------------------------
 
-const contextPayloadSchema = z.discriminatedUnion('kind', [
+const canonicalContextPayloadSchema = z.discriminatedUnion('kind', [
     z.object({
         kind: z.literal('code-comment'),
         source: z.enum(['diff', 'file', 'plan']),
@@ -301,12 +340,14 @@ const contextPayloadSchema = z.discriminatedUnion('kind', [
         label: z.string(),
         body: z.string(),
         text: z.string(),
+        provider: z.enum(['github', 'gitlab']).optional(),
     }),
     z.object({
         kind: z.literal('pr-check'),
         label: z.string(),
         output: z.string(),
         text: z.string(),
+        provider: z.enum(['github', 'gitlab']).optional(),
     }),
     z.object({
         kind: z.literal('file-quote'),
@@ -319,17 +360,20 @@ const contextPayloadSchema = z.discriminatedUnion('kind', [
     z.object({
         kind: z.literal('chat-quote'),
         messageId: z.string().optional(),
+        anchor: chatQuoteAnchorSchema.optional(),
         quote: z.string(),
         text: z.string(),
     }),
     z.object({
-        kind: z.literal('github-issue'),
+        kind: z.literal('repository-issue'),
+        provider: z.enum(['github', 'gitlab']).optional(),
         number: z.number().int().positive(),
         title: z.string(),
         url: z.string(),
     }),
     z.object({
-        kind: z.literal('github-pr'),
+        kind: z.literal('change-request'),
+        provider: z.enum(['github', 'gitlab']).optional(),
         number: z.number().int().positive(),
         title: z.string(),
         url: z.string(),
@@ -340,6 +384,37 @@ const contextPayloadSchema = z.discriminatedUnion('kind', [
         title: z.string(),
         url: z.string(),
     }),
+    z.object({
+        kind: z.literal('guest-issue'),
+        providerId: z.string().min(1),
+        id: z.string().min(1),
+        title: z.string(),
+        url: z.string(),
+        data: z.json().optional(),
+    }),
+    z.object({
+        kind: z.literal('guest-pr'),
+        providerId: z.string().min(1),
+        id: z.string().min(1),
+        title: z.string(),
+        url: z.string(),
+        data: z.json().optional(),
+    }),
+]);
+const contextPayloadSchema = z.union([
+    canonicalContextPayloadSchema,
+    z.object({
+        kind: z.literal('github-issue'),
+        number: z.number().int().positive(),
+        title: z.string(),
+        url: z.string(),
+    }).transform(({ number, title, url }): RepositoryIssueContext => ({ kind: 'repository-issue', number, title, url })),
+    z.object({
+        kind: z.literal('github-pr'),
+        number: z.number().int().positive(),
+        title: z.string(),
+        url: z.string(),
+    }).transform(({ number, title, url }): ChangeRequestContext => ({ kind: 'change-request', provider: 'github', number, title, url })),
 ]);
 
 /**
@@ -369,8 +444,12 @@ export const contextPartMetadataSchema = z.object({
     [OPENCODE_COMMENT_METADATA_KEY]: openCodeCommentSchema.optional(),
 });
 
-/** The subset of a message part that context read-back inspects. */
-export type ContextCarrierPart = { type: string } & Pick<TextPart, 'metadata'>;
+/**
+ * The subset of a record that context read-back inspects. Context now travels
+ * as synthetic messages, which carry no `type`; the optional field keeps the
+ * reader usable for anything else that carries the same metadata.
+ */
+export type ContextCarrierPart = { type?: string; metadata?: Metadata };
 
 /**
  * Read the structured context payload from a message part, if it carries one.
@@ -378,11 +457,17 @@ export type ContextCarrierPart = { type: string } & Pick<TextPart, 'metadata'>;
  * schema-validated before it is trusted.
  */
 export function readContextPart(part: ContextCarrierPart): ContextPartPayload | null {
-    if (part.type !== 'text') return null;
-    const parsed = contextPayloadSchema.safeParse(part.metadata?.[CONTEXT_METADATA_KEY]);
+    if (part.type !== undefined && part.type !== 'text') return null;
+    const contextValue = part.metadata?.[CONTEXT_METADATA_KEY];
+    const commentValue = part.metadata?.[OPENCODE_COMMENT_METADATA_KEY];
+    // Most parts carry neither key; neither schema accepts undefined, and a
+    // failed safeParse allocates a ZodError, so skip parsing for them.
+    if (contextValue === undefined && commentValue === undefined) return null;
+
+    const parsed = contextPayloadSchema.safeParse(contextValue);
     if (parsed.success) return parsed.data;
 
-    const compatible = openCodeCommentSchema.safeParse(part.metadata?.[OPENCODE_COMMENT_METADATA_KEY]);
+    const compatible = openCodeCommentSchema.safeParse(commentValue);
     if (compatible.success) {
         const comment = compatible.data;
         if (!comment.selection) {
@@ -458,9 +543,9 @@ export function draftFromContextPayload(
                 text: payload.text,
             };
         case 'pr-comment':
-            return { source: 'pr-comment', fileLabel: payload.label, startLine: 0, endLine: 0, code: payload.body, language: '', text: payload.text };
+            return { source: 'pr-comment', fileLabel: payload.label, startLine: 0, endLine: 0, code: payload.body, language: '', text: payload.text, ...(payload.provider ? { provider: payload.provider } : {}) };
         case 'pr-check':
-            return { source: 'pr-check', fileLabel: payload.label, startLine: 0, endLine: 0, code: payload.output, language: '', text: payload.text };
+            return { source: 'pr-check', fileLabel: payload.label, startLine: 0, endLine: 0, code: payload.output, language: '', text: payload.text, ...(payload.provider ? { provider: payload.provider } : {}) };
         case 'file-quote':
             return {
                 source: 'file-quote',
@@ -480,10 +565,13 @@ export function draftFromContextPayload(
                 code: payload.quote,
                 language: '',
                 text: payload.text,
+                anchor: payload.anchor,
             };
-        case 'github-issue':
-        case 'github-pr':
+        case 'repository-issue':
+        case 'change-request':
         case 'linear-issue':
+        case 'guest-issue':
+        case 'guest-pr':
             return null;
     }
 }

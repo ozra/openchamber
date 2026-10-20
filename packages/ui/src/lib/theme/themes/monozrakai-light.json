@@ -148,16 +148,12 @@
       "divider": "#E9E0CF"
     },
     "tools": {
-      "background": "#F8F2E680",
       "border": "#d0c8b880",
-      "headerHover": "#F7EFDD",
       "icon": "#6D5C40",
       "title": "#292318",
       "description": "#6D5C40",
       "edit": {
-        "added": "#4FB54B",
         "addedBackground": "#4FB54B25",
-        "removed": "#E54B4B",
         "removedBackground": "#E54B4B25",
         "lineNumber": "#bfb5a4"
       }

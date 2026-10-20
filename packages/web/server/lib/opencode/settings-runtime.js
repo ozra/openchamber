@@ -1,4 +1,4 @@
-import { createProjectIdFromPath } from '../projects/project-id.js';
+import { createProjectIdFromPath, projectConfigFileStemOf } from '../projects/project-id.js';
 import {
   buildPreferencesFields,
   flattenPreferences,
@@ -40,6 +40,18 @@ const ensureNotificationTemplateShape = (templates) => {
   return { templates: next, changed };
 };
 
+/** Settings that decide which OpenChamber plugins the managed OpenCode loads. */
+const MANAGED_PLUGIN_SETTINGS_KEYS = new Set([
+  'agentControlToolEnabled',
+  'agentScheduleToolEnabled',
+  'agentWebToolEnabled',
+  'agentMemoryToolEnabled',
+  'agentKnowledgeToolEnabled',
+  'agentNotifyToolEnabled',
+  'agentRenderToolEnabled',
+  'agentToolsCodeMode',
+]);
+
 export const createSettingsRuntime = (deps) => {
   const {
     fsPromises,
@@ -58,6 +70,12 @@ export const createSettingsRuntime = (deps) => {
     normalizeManagedRemoteTunnelPresetTokens,
     syncManagedRemoteTunnelConfigWithPresets,
     upsertManagedRemoteTunnelToken,
+    chatRoots = [],
+    onManagedPluginSettingsChanged = async () => {},
+    onMessageSearchEnabledChanged = () => {},
+    onMessageSearchReasoningChanged = () => {},
+    onPermissionDefaultModeChanged = () => {},
+    onLastDirectoryChanged = () => {},
   } = deps;
 
   let persistSettingsLock = Promise.resolve();
@@ -288,10 +306,10 @@ export const createSettingsRuntime = (deps) => {
       return;
     }
 
-    const oldConfigPath = path.join(PROJECTS_ROOT_DIR, `${oldId}.json`);
-    const newConfigPath = path.join(PROJECTS_ROOT_DIR, `${newId}.json`);
-    const oldStorageDir = path.join(PROJECTS_ROOT_DIR, oldId);
-    const newStorageDir = path.join(PROJECTS_ROOT_DIR, newId);
+    const oldConfigPath = path.join(PROJECTS_ROOT_DIR, `${projectConfigFileStemOf(oldId)}.json`);
+    const newConfigPath = path.join(PROJECTS_ROOT_DIR, `${projectConfigFileStemOf(newId)}.json`);
+    const oldStorageDir = path.join(PROJECTS_ROOT_DIR, projectConfigFileStemOf(oldId));
+    const newStorageDir = path.join(PROJECTS_ROOT_DIR, projectConfigFileStemOf(newId));
 
     const [oldConfig, newConfig] = await Promise.all([
       readJsonFile(oldConfigPath),
@@ -306,6 +324,28 @@ export const createSettingsRuntime = (deps) => {
     await mergeProjectContextFiles(oldStorageDir, newStorageDir);
     await moveDirectoryContents(oldStorageDir, newStorageDir);
     await fsPromises.rm(oldConfigPath, { force: true });
+  };
+
+  /**
+   * A build before the bounded folder name created `<projectId>/` for an id
+   * the filesystem still accepted (201 to 255 characters; longer ids never
+   * got a folder). Only the bounded folder is read now, so that folder's
+   * notes, plans, and memory are moved over once. A raw name the filesystem
+   * cannot hold (ENAMETOOLONG) means no such folder ever existed.
+   */
+  const migrateRawIdStorageFolder = async (projectId) => {
+    const stem = projectConfigFileStemOf(projectId);
+    if (stem === projectId) return;
+    const rawStorageDir = path.join(PROJECTS_ROOT_DIR, projectId);
+    try {
+      await fsPromises.stat(rawStorageDir);
+    } catch (error) {
+      if (error?.code === 'ENOENT' || error?.code === 'ENAMETOOLONG') return;
+      throw error;
+    }
+    const boundedStorageDir = path.join(PROJECTS_ROOT_DIR, stem);
+    await mergeProjectContextFiles(rawStorageDir, boundedStorageDir);
+    await moveDirectoryContents(rawStorageDir, boundedStorageDir);
   };
 
   const migrateSettingsToDeterministicProjectIds = async (current) => {
@@ -328,6 +368,7 @@ export const createSettingsRuntime = (deps) => {
         await migrateProjectScopedStorage({ oldId: project.id, newId: nextId, projectPath: project.path });
         await migrateProjectIconFiles({ oldId: project.id, newId: nextId });
       }
+      await migrateRawIdStorageFolder(nextId);
       nextProjects.push({ ...project, id: nextId });
     }
 
@@ -468,19 +509,23 @@ export const createSettingsRuntime = (deps) => {
     for (const [projectId, orphansForProject] of matches.entries()) {
       const project = canonicalProjects.find((p) => p.id === projectId);
       if (!project) continue;
-      const targetPath = path.join(PROJECTS_ROOT_DIR, `${project.id}.json`);
+      const targetStem = projectConfigFileStemOf(project.id);
+      const targetPath = path.join(PROJECTS_ROOT_DIR, `${targetStem}.json`);
+      const targetStorageDir = path.join(PROJECTS_ROOT_DIR, targetStem);
 
       for (const orphan of orphansForProject) {
         const targetExisting = (await readJsonFile(targetPath)) || {};
+        // An orphan is named by the file found on disk, so its folder is the raw name.
+        const orphanStorageDir = path.join(PROJECTS_ROOT_DIR, orphan.orphanId);
         const merged = mergeProjectConfigData({
           oldConfig: orphan.content,
           newConfig: targetExisting,
-          oldStorageDir: path.join(PROJECTS_ROOT_DIR, orphan.orphanId),
-          newStorageDir: path.join(PROJECTS_ROOT_DIR, project.id),
+          oldStorageDir: orphanStorageDir,
+          newStorageDir: targetStorageDir,
           projectPath: project.path,
         });
         await writeJsonFile(targetPath, merged);
-        await moveDirectoryContents(path.join(PROJECTS_ROOT_DIR, orphan.orphanId), path.join(PROJECTS_ROOT_DIR, project.id));
+        await moveDirectoryContents(orphanStorageDir, targetStorageDir);
         await fsPromises.rm(orphan.filePath, { force: true });
         orphansConsumed.add(orphan.orphanId);
         console.log(`[projects] Recovered orphan ${orphan.orphanId} -> ${project.id} (${project.path})`);
@@ -650,8 +695,10 @@ export const createSettingsRuntime = (deps) => {
 
   const writeJsonFileAtomic = async (filePath, text) => {
     const directory = path.dirname(filePath);
-    await fsPromises.mkdir(directory, { recursive: true, mode: 0o700 });
-    if (process.platform !== 'win32') await fsPromises.chmod(directory, 0o700);
+    // Tighten only a directory this write created (mkdir's mode is umasked):
+    // an existing one keeps the permissions and ACLs an administrator gave it.
+    const created = await fsPromises.mkdir(directory, { recursive: true, mode: 0o700 });
+    if (created && process.platform !== 'win32') await fsPromises.chmod(directory, 0o700);
     // Atomic write: Electron main and ssh-manager read these files via plain
     // readFile + JSON.parse and silently coerce parse errors to {}. A
     // partial read during a non-atomic writeFile would make their next
@@ -727,6 +774,23 @@ export const createSettingsRuntime = (deps) => {
     return (await Promise.all(validations)).filter((p) => p !== null);
   };
 
+  const isWithinRoot = (candidate, root) => {
+    const relative = path.relative(root, candidate);
+    return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+  };
+
+  // A chat's folder belongs to no project. With no project open, the folder
+  // the UI last browsed is often a chat's, and it must not become one.
+  const isChatDirectory = async (candidate) => {
+    const roots = chatRoots.filter(Boolean).map((root) => path.resolve(root));
+    if (roots.some((root) => isWithinRoot(candidate, root))) {
+      return true;
+    }
+    const realCandidate = await fsPromises.realpath(candidate);
+    const realRoots = await Promise.all(roots.map((root) => fsPromises.realpath(root).catch(() => null)));
+    return realRoots.some((root) => root && isWithinRoot(realCandidate, root));
+  };
+
   const migrateSettingsFromLegacyLastDirectory = async (current) => {
     const settings = current && typeof current === 'object' ? current : {};
     const now = Date.now();
@@ -745,7 +809,7 @@ export const createSettingsRuntime = (deps) => {
       if (candidate) {
         try {
           const stats = await fsPromises.stat(candidate);
-          if (stats.isDirectory()) {
+          if (stats.isDirectory() && !(await isChatDirectory(candidate))) {
             const id = createProjectIdFromPath(candidate);
             nextProjects = [
               {
@@ -979,6 +1043,17 @@ export const createSettingsRuntime = (deps) => {
     return { settings: next, changed: true };
   };
 
+  // Scheduled tasks used to be part of the agent control tool. Someone who had
+  // switched that tool off keeps them off after the split instead of getting a
+  // scheduling tool they never chose.
+  const migrateSettingsScheduleToolFromControl = (settings) => {
+    const chosen = settings.agentScheduleToolEnabled === true || settings.agentScheduleToolEnabled === false;
+    if (settings.agentControlToolEnabled !== false || chosen) {
+      return { settings, changed: false };
+    }
+    return { settings: { ...settings, agentScheduleToolEnabled: false }, changed: true };
+  };
+
   let hasCleanedOrphanedTempFiles = false;
 
   const readSettingsFromDiskMigrated = async ({ surface = null } = {}) => {
@@ -995,12 +1070,13 @@ export const createSettingsRuntime = (deps) => {
     const migration6 = normalizeSettingsPaths(migration5.settings);
     const migration7 = await migrateSettingsToDeterministicProjectIds(migration6.settings);
     const migration8 = migrateSettingsRemoveApprovedDirectories(migration7.settings);
-    if (migration1.changed || migration2.changed || migration3.changed || migration4.changed || migration5.changed || migration6.changed || migration7.changed || migration8.changed) {
-      await writeSettingsToDisk(migration8.settings);
+    const migration9 = migrateSettingsScheduleToolFromControl(migration8.settings);
+    if (migration1.changed || migration2.changed || migration3.changed || migration4.changed || migration5.changed || migration6.changed || migration7.changed || migration8.changed || migration9.changed) {
+      await writeSettingsToDisk(migration9.settings);
     }
     // Migrations run on the base view; a surface asks for its own resolution
     // of the per-surface keys on top of the migrated files.
-    return normalizeSettingsSurface(surface) ? readSettingsFromDisk({ surface }) : migration8.settings;
+    return normalizeSettingsSurface(surface) ? readSettingsFromDisk({ surface }) : migration9.settings;
   };
 
   const persistSettings = async (changes, { surface = null } = {}) => {
@@ -1083,7 +1159,29 @@ export const createSettingsRuntime = (deps) => {
         }
       }
 
-      await writeSettingsToDisk(next, { surface, changedKeys: Object.keys(sanitized) });
+      const changedKeys = Object.keys(sanitized);
+      await writeSettingsToDisk(next, { surface, changedKeys });
+      // OpenChamber's own OpenCode plugins live in a config file OpenCode
+      // watches, so flipping one of these switches takes effect in the running
+      // process instead of waiting for a restart.
+      if (changedKeys.some((key) => MANAGED_PLUGIN_SETTINGS_KEYS.has(key))) {
+        await Promise.resolve(onManagedPluginSettingsChanged(next)).catch((error) => {
+          console.warn('Failed to refresh the managed OpenCode config:', error?.message ?? error);
+        });
+      }
+      // The search index starts or stops in the background; the save does not wait for it.
+      if (changedKeys.includes('messageSearchEnabled')) {
+        onMessageSearchEnabledChanged(next.messageSearchEnabled === true);
+      }
+      if (changedKeys.includes('messageSearchReasoningEnabled')) {
+        onMessageSearchReasoningChanged(next.messageSearchReasoningEnabled === true);
+      }
+      if (changedKeys.includes('permissionDefaultMode') && next.permissionDefaultMode !== current.permissionDefaultMode) {
+        onPermissionDefaultModeChanged(next.permissionDefaultMode);
+      }
+      if (changedKeys.includes('lastDirectory') && next.lastDirectory !== current.lastDirectory) {
+        onLastDirectoryChanged(next.lastDirectory);
+      }
       return formatSettingsResponse(next);
     });
 

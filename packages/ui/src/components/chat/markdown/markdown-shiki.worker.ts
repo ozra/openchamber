@@ -1,7 +1,8 @@
 /// <reference lib="webworker" />
 
-import { bundledLanguages, createHighlighter, type BundledLanguage, type LanguageRegistration, type ThemedToken } from 'shiki';
+import { bundledLanguages, createHighlighter, hastToHtml, type BundledLanguage, type LanguageRegistration, type ThemedToken } from 'shiki';
 import { sanitizeTemplateCallGrammar } from '../../../lib/shiki/sanitizeTemplateCallGrammar';
+import { createIncrementalCodeHighlighter, splitRendered, type RenderedLines } from './incrementalCodeHighlight';
 import { MARKDOWN_SHIKI_THEME, MARKDOWN_SHIKI_THEME_DEFINITION } from './markdownShikiThemeDefinition';
 import type { MarkdownWorkerRequest, MarkdownWorkerResponse } from './markdown-worker-protocol';
 
@@ -52,6 +53,10 @@ self.onmessage = (event: MessageEvent<MarkdownWorkerRequest>) => {
     queue = queue.then(() => highlight(request)).catch(() => {});
     return;
   }
+  if (request.type === 'highlightFrom') {
+    queue = queue.then(() => highlightFrom(request)).catch(() => {});
+    return;
+  }
   if (request.type === 'highlightTokens') {
     queue = queue.then(() => highlightTokens(request)).catch(() => {});
     return;
@@ -94,16 +99,54 @@ const resolveLanguage = async (instance: Instance, requested: string): Promise<s
   return lang;
 };
 
+// A streamed fence arrives here once per new line with the whole block so far.
+// Only the new lines are tokenized; see incrementalCodeHighlight.ts. The state
+// lives in this worker, so a worker restarted after a hang simply starts the
+// next block over with a full pass.
+let incrementalInstance: Instance | undefined;
+let incremental: ReturnType<typeof createIncrementalCodeHighlighter> | undefined;
+
+const incrementalFor = (instance: Instance): ReturnType<typeof createIncrementalCodeHighlighter> => {
+  if (incremental && incrementalInstance === instance) return incremental;
+  incrementalInstance = instance;
+  incremental = createIncrementalCodeHighlighter({
+    render: (chunk, lang, grammarState) => {
+      const hast = instance.codeToHast(chunk, { lang, theme: MARKDOWN_SHIKI_THEME, tabindex: false, grammarState });
+      return { html: hastToHtml(hast), grammarState: instance.getLastGrammarState(hast) };
+    },
+  });
+  return incremental;
+};
+
 async function highlight(request: Extract<MarkdownWorkerRequest, { type: 'highlight' }>): Promise<void> {
   try {
     const instance = await ensureHighlighter();
     const lang = await resolveLanguage(instance, request.lang);
-    const html = instance.codeToHtml(request.code, {
-      lang,
-      theme: MARKDOWN_SHIKI_THEME,
-      tabindex: false,
-    });
+    const html = (request.fullPass ? null : incrementalFor(instance).highlight(request.code, lang))
+      ?? instance.codeToHtml(request.code, {
+        lang,
+        theme: MARKDOWN_SHIKI_THEME,
+        tabindex: false,
+      });
     post({ type: 'highlight', id: request.id, html });
+  } catch (error) {
+    post({ type: 'error', id: request.id, message: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+const sliceLines = (html: string, fromLine: number): RenderedLines | null => {
+  const rendered = splitRendered(html);
+  return rendered && { ...rendered, lines: rendered.lines.slice(fromLine) };
+};
+
+async function highlightFrom(request: Extract<MarkdownWorkerRequest, { type: 'highlightFrom' }>): Promise<void> {
+  try {
+    const instance = await ensureHighlighter();
+    const lang = await resolveLanguage(instance, request.lang);
+    const rendered = incrementalFor(instance).highlightLines(request.code, lang, request.fromLine)
+      ?? sliceLines(instance.codeToHtml(request.code, { lang, theme: MARKDOWN_SHIKI_THEME, tabindex: false }), request.fromLine);
+    if (!rendered) throw new Error('Unexpected Shiki output');
+    post({ type: 'highlightFrom', id: request.id, fromLine: request.fromLine, ...rendered });
   } catch (error) {
     post({ type: 'error', id: request.id, message: error instanceof Error ? error.message : String(error) });
   }

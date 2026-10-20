@@ -1,9 +1,22 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createOpencodeClient } from '@opencode-ai/sdk/v2';
+import { setTimeout as delay } from 'node:timers/promises';
+import { OpenCode, type OpenCodeClient } from '@opencode/client';
 import * as gitService from './gitService';
-import { chooseBridgeGitGenerationModel, type BridgeGitGenerationPayloadModel } from './bridge-git-generation-model';
+import { chooseBridgeGitGenerationModel, type BridgeGitGenerationPayloadModel, type BridgeGitGenerationModelChoice } from './bridge-git-generation-model';
 import type { BridgeContext, BridgeResponse } from './bridge';
+import {
+  COMMIT_DIFF_FILE_LIMIT,
+  COMMIT_DIFF_TOTAL_CHAR_LIMIT,
+  COMMIT_STYLE_SAMPLE_COUNT,
+  buildCommitGenerationPrompt,
+  formatRecentCommitSubjects,
+  parseGeneratedCommitMessage,
+  commitPathUsesStagedDiff,
+  selectCommitFilePaths,
+  type GeneratedCommitMessage,
+  type GitStatusFileLike,
+} from './git-commit-message';
 
 type BridgeMessageInput = {
   id: string;
@@ -16,231 +29,294 @@ type ExecGitResult = { stdout: string; stderr: string; exitCode: number };
 type SpecialGitDeps = {
   readSettings: (ctx?: BridgeContext) => Record<string, unknown>;
   execGit: (args: string[], cwd: string) => Promise<ExecGitResult>;
+  /** Magic prompt overrides keyed by prompt id; read through the host so this module stays free of `vscode`. */
+  readPromptOverrides: () => Record<string, string>;
 };
 
 const BRIDGE_GIT_GENERATION_TIMEOUT_MS = 2 * 60 * 1000;
-const BRIDGE_GIT_GENERATION_POLL_INTERVAL_MS = 500;
+
+// Waits between retries of `Model unavailable`, ~31 s in total. Right after
+// OpenCode starts, plugin-provided models (claude-code) stay unavailable for
+// 20-40 s while plugins for the global location load lazily. The rejection
+// precedes provider dispatch, so a retry costs no tokens.
+const UNAVAILABLE_RETRY_DELAYS_MS = [500, 1_000, 2_000, 4_000, 8_000, 16_000];
+let unavailableRetryDelaysMs = UNAVAILABLE_RETRY_DELAYS_MS;
+
+/** Test hook: replace the backoff schedule; no argument restores the default. */
+export const setUnavailableRetryDelaysForTest = (delays: number[] = UNAVAILABLE_RETRY_DELAYS_MS): void => {
+  unavailableRetryDelaysMs = delays;
+};
 const BRIDGE_GIT_MODEL_CATALOG_CACHE_TTL_MS = 30 * 1000;
 
-let bridgeGitModelCatalogCache: Set<string> | null = null;
-let bridgeGitModelCatalogCacheAt = 0;
+// Model lists are directory-scoped, so the cached catalog belongs to the
+// directory it was read for; a flow in another repository must not inherit it.
+// `disabled` holds the refs OpenCode lists with `enabled: false`.
+type BridgeGitModelCatalog = { disabled: Set<string> };
+let bridgeGitModelCatalogCache: { directory: string; catalog: BridgeGitModelCatalog; at: number } | null = null;
 
-const sleep = (ms: number) => new Promise<void>((resolve) => {
-  setTimeout(resolve, ms);
-});
-
-type BridgeSdkResult<T> = {
-  data?: T;
-  error?: unknown;
-  response?: { status?: number };
+/** Test hook: forget the cached model catalog. */
+export const resetBridgeGitModelCatalogForTest = (): void => {
+  bridgeGitModelCatalogCache = null;
 };
 
-const formatBridgeSdkError = (error: unknown): string => {
-  if (error instanceof Error) return error.message;
-  if (typeof error === 'string') return error;
-  if (error && typeof error === 'object' && 'message' in error && typeof (error as { message: unknown }).message === 'string') {
-    return (error as { message: string }).message;
-  }
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
+// Every OpenCode read here names the flow's directory: model lists, agent
+// reads and generation resolve against a location, and without one OpenCode
+// answers for its own working directory (with its MCP servers started there).
+const createBridgeGitClient = (apiUrl: string, authHeaders?: Record<string, string>, directory?: string): OpenCodeClient => {
+  const headers = Object.assign({}, authHeaders || {});
+  if (directory) headers['x-opencode-directory'] = encodeURIComponent(directory);
+  return OpenCode.make({
+    baseUrl: apiUrl.replace(/\/+$/, ''),
+    headers,
+  });
 };
-
-const unwrapBridgeSdkData = <T,>(result: BridgeSdkResult<T>, operation: string): T => {
-  if (result.error) {
-    const status = result.response?.status;
-    throw new Error(`${operation} failed${status ? ` (${status})` : ''}: ${formatBridgeSdkError(result.error)}`);
-  }
-  if (result.data === undefined || result.data === null) {
-    throw new Error(`${operation} failed: empty response`);
-  }
-  return result.data;
-};
-
-const assertBridgeSdkSuccess = (result: BridgeSdkResult<unknown>, operation: string): void => {
-  if (result.error) {
-    const status = result.response?.status;
-    throw new Error(`${operation} failed${status ? ` (${status})` : ''}: ${formatBridgeSdkError(result.error)}`);
-  }
-};
-
-const createBridgeGitClient = (apiUrl: string, authHeaders?: Record<string, string>) => createOpencodeClient({
-  baseUrl: apiUrl.replace(/\/+$/, ''),
-  headers: authHeaders || {},
-});
 
 const fetchBridgeGitModelCatalog = async (
   apiUrl: string,
-  authHeaders?: Record<string, string>
-): Promise<Set<string>> => {
+  authHeaders?: Record<string, string>,
+  directory = '',
+): Promise<BridgeGitModelCatalog> => {
   const now = Date.now();
-  if (bridgeGitModelCatalogCache && now - bridgeGitModelCatalogCacheAt < BRIDGE_GIT_MODEL_CATALOG_CACHE_TTL_MS) {
-    return bridgeGitModelCatalogCache;
+  if (
+    bridgeGitModelCatalogCache
+    && bridgeGitModelCatalogCache.directory === directory
+    && now - bridgeGitModelCatalogCache.at < BRIDGE_GIT_MODEL_CATALOG_CACHE_TTL_MS
+  ) {
+    return bridgeGitModelCatalogCache.catalog;
   }
 
-  const client = createBridgeGitClient(apiUrl, authHeaders);
-  const payload = unwrapBridgeSdkData(
-    await client.v2.model.list(undefined, { signal: AbortSignal.timeout(8_000) }),
-    'model.list'
-  );
-  const refs = new Set<string>();
-  if (Array.isArray(payload)) {
-    for (const item of payload) {
-      if (!item || typeof item !== 'object') {
-        continue;
-      }
-      const record = item as Record<string, unknown>;
-      const providerID = typeof record.providerID === 'string' ? record.providerID.trim() : '';
-      const modelID = typeof record.id === 'string'
-        ? record.id.trim()
-        : (typeof record.modelID === 'string' ? record.modelID.trim() : '');
-      if (providerID && modelID) {
-        refs.add(`${providerID}/${modelID}`);
-      }
+  const client = createBridgeGitClient(apiUrl, authHeaders, directory);
+  const payload = await client.model.list(undefined, { signal: AbortSignal.timeout(8_000) });
+  const catalog: BridgeGitModelCatalog = { disabled: new Set() };
+  for (const model of payload.data) {
+    const providerID = model.providerID.trim();
+    const modelID = model.id.trim();
+    if (providerID && modelID && model.enabled === false) {
+      catalog.disabled.add(`${providerID}/${modelID}`);
     }
   }
 
-  bridgeGitModelCatalogCache = refs;
-  bridgeGitModelCatalogCacheAt = now;
-  return refs;
+  bridgeGitModelCatalogCache = { directory, catalog, at: now };
+  return catalog;
+};
+
+/**
+ * The model OpenCode's hidden `title` agent is configured with
+ * (`agents.title.model`, or the migrated v1 `small_model`), or null. The
+ * server-side small-model resolver reads the same agent; the bridge must
+ * agree with it. A cold location answers 404 while its agents load, which
+ * reads as "nothing configured" here, the same as on the server.
+ */
+const fetchBridgeGitTitleModelRef = async (client: OpenCodeClient): Promise<BridgeGitGenerationModelChoice | null> => {
+  try {
+    const payload = await client.agent.get({ agentID: 'title' });
+    const model = payload.data.model;
+    return model ? { providerID: model.providerID, modelID: model.id } : null;
+  } catch {
+    // No `title` agent (removed in config, or a cold location still loading
+    // its agents) or OpenCode unreachable: nothing configured to honor.
+    return null;
+  }
 };
 
 const resolveBridgeGitGenerationModel = async (
   payloadModel: BridgeGitGenerationPayloadModel,
   settings: Record<string, unknown>,
   apiUrl: string,
-  authHeaders?: Record<string, string>
+  authHeaders?: Record<string, string>,
+  directory = '',
 ): Promise<{ providerID: string; modelID: string }> => {
-  let catalog: Set<string> | null = null;
+  let catalog: BridgeGitModelCatalog | null = null;
   try {
-    catalog = await fetchBridgeGitModelCatalog(apiUrl, authHeaders);
+    catalog = await fetchBridgeGitModelCatalog(apiUrl, authHeaders, directory);
   } catch {
     catalog = null;
   }
+  const titleModel = await fetchBridgeGitTitleModelRef(createBridgeGitClient(apiUrl, authHeaders, directory));
+  // Like the server's small-model resolver, a title model OpenCode lists as
+  // disabled is skipped rather than retried until it fails.
+  const configuredModel = titleModel && !catalog?.disabled.has(`${titleModel.providerID}/${titleModel.modelID}`)
+    ? titleModel
+    : null;
 
-  const hasModel = (providerID: string, modelID: string): boolean => {
-    if (!catalog) {
-      return false;
-    }
-    return catalog.has(`${providerID}/${modelID}`);
-  };
+  // A catalog only rejects a model it lists as disabled, which is the rule the
+  // server-side resolver applies: a config can outlive the login behind it, and
+  // OpenCode's own titles move on to another model, but a model the catalog
+  // does not list at all (a plugin provider still loading, or a cold location
+  // that answered before its providers did) is kept. Gating on "listed" dropped
+  // the user's configured small model on every cold start, sent generation to
+  // the zen default they cannot use, and the `Model unavailable` retry loop
+  // then retried that wrong model until it gave up.
+  const hasModel = (providerID: string, modelID: string): boolean => (
+    !catalog?.disabled.has(`${providerID}/${modelID}`)
+  );
 
-  return chooseBridgeGitGenerationModel(payloadModel, settings, hasModel);
+  return chooseBridgeGitGenerationModel(payloadModel, settings, hasModel, configuredModel);
 };
 
-const extractTextFromMessageParts = (parts: unknown): string => {
-  if (!Array.isArray(parts)) {
-    return '';
-  }
-
-  const textParts = parts
-    .filter((part) => {
-      if (!part || typeof part !== 'object') return false;
-      const record = part as Record<string, unknown>;
-      return record.type === 'text' && typeof record.text === 'string';
-    })
-    .map((part) => (part as Record<string, unknown>).text as string)
-    .map((text) => text.trim())
-    .filter((text) => text.length > 0);
-
-  return textParts.join('\n').trim();
-};
-
-const generateBridgeTextWithSessionFlow = async ({
+/**
+ * OpenCode 2.x generates one-off text without a session: `POST /api/experimental/generate`
+ * answers with the finished text, so the old create-session / prompt / poll /
+ * delete dance (and every way it could leave a stray session behind) is gone.
+ */
+const generateBridgeGitText = async ({
   apiUrl,
-  directory,
   prompt,
   providerID,
   modelID,
   authHeaders,
+  directory,
 }: {
   apiUrl: string;
-  directory: string;
   prompt: string;
   providerID: string;
   modelID: string;
   authHeaders?: Record<string, string>;
+  directory?: string;
 }): Promise<string> => {
-  const client = createBridgeGitClient(apiUrl, authHeaders);
-  const deadlineAt = Date.now() + BRIDGE_GIT_GENERATION_TIMEOUT_MS;
-  const remainingMs = () => Math.max(1_000, deadlineAt - Date.now());
-  let sessionId: string | null = null;
-
-  try {
-    const session = unwrapBridgeSdkData(
-      await client.session.create({
-        ...(directory ? { directory } : {}),
-        title: 'Git Generation',
-      }, { signal: AbortSignal.timeout(remainingMs()) }),
-      'session.create'
-    );
-    const sessionObj = session && typeof session === 'object' ? session as Record<string, unknown> : null;
-    const createdSessionId = sessionObj && typeof sessionObj.id === 'string' ? sessionObj.id : '';
-    if (!createdSessionId) {
-      throw new Error('Invalid session response');
-    }
-    sessionId = createdSessionId;
-
-    assertBridgeSdkSuccess(
-      await client.session.promptAsync({
-        sessionID: sessionId,
-        ...(directory ? { directory } : {}),
-        model: {
-          providerID,
-          modelID,
-        },
-        parts: [{ type: 'text', text: prompt }],
-      }, { signal: AbortSignal.timeout(remainingMs()) }),
-      'session.promptAsync'
-    );
-
-    while (Date.now() < deadlineAt) {
-      await sleep(BRIDGE_GIT_GENERATION_POLL_INTERVAL_MS);
-
-      const messagesResponse = await client.session.messages({
-        sessionID: sessionId,
-        ...(directory ? { directory } : {}),
-        limit: 10,
-      }, { signal: AbortSignal.timeout(remainingMs()) });
-
-      if (messagesResponse.error) {
-        continue;
+  const client = createBridgeGitClient(apiUrl, authHeaders, directory);
+  const signal = AbortSignal.timeout(BRIDGE_GIT_GENERATION_TIMEOUT_MS);
+  const unavailableMessage = `Model unavailable: ${providerID}/${modelID}`;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const result = await client.generate.text({ prompt, model: { id: modelID, providerID } }, { signal });
+      return result.text.trim();
+    } catch (error) {
+      const tagged = error as { _tag?: unknown; message?: unknown } | null;
+      // Only the pre-dispatch catalog rejection is retried; other failures must not be.
+      if (tagged?._tag !== 'InvalidRequestError' || tagged.message !== unavailableMessage
+        || attempt >= unavailableRetryDelaysMs.length) {
+        throw error;
       }
-
-      const messages = messagesResponse.data;
-      if (!Array.isArray(messages)) {
-        continue;
-      }
-
-      for (let i = messages.length - 1; i >= 0; i--) {
-        const message = messages[i] as Record<string, unknown> | null;
-        if (!message || typeof message !== 'object') {
-          continue;
-        }
-        const info = message.info as Record<string, unknown> | undefined;
-        if (info?.role !== 'assistant' || info?.finish !== 'stop') {
-          continue;
-        }
-
-        const text = extractTextFromMessageParts(message.parts);
-        if (text) {
-          return text;
-        }
-      }
-    }
-
-    throw new Error('Timeout waiting for generation to complete');
-  } finally {
-    if (sessionId) {
-      try {
-        await client.session.delete({ sessionID: sessionId }, { signal: AbortSignal.timeout(5_000) });
-      } catch {
-        // ignore cleanup failures
-      }
+      await delay(unavailableRetryDelaysMs[attempt], undefined, { signal });
     }
   }
+};
+
+const nullDevicePath = process.platform === 'win32' ? 'NUL' : '/dev/null';
+
+const collectRecentCommitSubjects = async (directory: string): Promise<string> => {
+  try {
+    const log = await gitService.getGitLog(directory, { maxCount: COMMIT_STYLE_SAMPLE_COUNT });
+    const messages = (Array.isArray(log?.all) ? log.all : [])
+      .map((entry) => (typeof entry?.message === 'string' ? entry.message : ''));
+    return formatRecentCommitSubjects(messages);
+  } catch {
+    return '(recent commits unavailable)';
+  }
+};
+
+const collectSelectedFileDiffs = async (
+  directory: string,
+  files: string[],
+  statusFiles: GitStatusFileLike[],
+  execGit: SpecialGitDeps['execGit'],
+): Promise<string> => {
+  const statusByPath = new Map(statusFiles.map((file) => [file.path, file]));
+  const limited = files.slice(0, COMMIT_DIFF_FILE_LIMIT);
+  const chunks = await Promise.all(limited.map(async (filePath) => {
+    try {
+      if (commitPathUsesStagedDiff(statusByPath.get(filePath))) {
+        const staged = await gitService.getGitDiff(directory, filePath, true).catch(() => null);
+        if (staged?.kind === 'diff' && staged.diff.trim()) return staged.diff;
+        return `--- ${filePath} (no textual diff available)`;
+      }
+
+      const unstaged = await gitService.getGitDiff(directory, filePath, false).catch(() => null);
+      if (unstaged?.kind === 'diff' && unstaged.diff.trim()) return unstaged.diff;
+
+      const noIndex = await execGit(
+        ['diff', '--no-color', '--no-index', '--', nullDevicePath, filePath],
+        directory,
+      );
+      if (noIndex.stdout.trim()) return noIndex.stdout;
+      return `--- ${filePath} (no textual diff available)`;
+    } catch {
+      return `--- ${filePath} (diff unavailable)`;
+    }
+  }));
+
+  let total = '';
+  for (const chunk of chunks) {
+    if (total.length + chunk.length > COMMIT_DIFF_TOTAL_CHAR_LIMIT) {
+      total += '\n[remaining diffs truncated]';
+      break;
+    }
+    total += (total ? '\n\n' : '') + chunk;
+  }
+  if (files.length > limited.length) {
+    total += `\n[${files.length - limited.length} more selected files omitted]`;
+  }
+  return total;
+};
+
+export const generateBridgeCommitMessage = async ({
+  directory,
+  files,
+  apiUrl,
+  authHeaders,
+  settings,
+  visiblePromptOverride,
+  instructionsPromptOverride,
+  payloadModel,
+  execGit,
+}: {
+  directory: string;
+  files?: string[];
+  apiUrl: string;
+  authHeaders?: Record<string, string>;
+  settings: Record<string, unknown>;
+  visiblePromptOverride?: string;
+  instructionsPromptOverride?: string;
+  payloadModel?: BridgeGitGenerationPayloadModel;
+  execGit: SpecialGitDeps['execGit'];
+}): Promise<GeneratedCommitMessage> => {
+  let selectedFiles = Array.isArray(files)
+    ? files.map((file) => file.trim()).filter(Boolean)
+    : [];
+  const status = await gitService.getGitStatus(directory, { mode: 'light' });
+  if (selectedFiles.length === 0) {
+    selectedFiles = selectCommitFilePaths(status.files);
+  }
+  if (selectedFiles.length === 0) {
+    throw new Error('No files provided to generate commit message');
+  }
+
+  const [recentCommits, diffs] = await Promise.all([
+    collectRecentCommitSubjects(directory),
+    collectSelectedFileDiffs(directory, selectedFiles, status.files, execGit),
+  ]);
+  if (!diffs.trim()) {
+    throw new Error('No diffs available for selected files');
+  }
+
+  const { system, prompt } = buildCommitGenerationPrompt(
+    selectedFiles,
+    recentCommits,
+    diffs,
+    visiblePromptOverride ?? '',
+    instructionsPromptOverride ?? '',
+  );
+  const { providerID, modelID } = await resolveBridgeGitGenerationModel(
+    payloadModel ?? {},
+    settings,
+    apiUrl,
+    authHeaders,
+    directory,
+  );
+  const raw = await generateBridgeGitText({
+    apiUrl,
+    prompt: `${system}\n\n${prompt}`,
+    providerID,
+    modelID,
+    authHeaders,
+    directory,
+  });
+  const parsed = parseGeneratedCommitMessage(raw);
+  if (!parsed) {
+    throw new Error('No commit message returned by generator');
+  }
+  return parsed;
 };
 
 const parseJsonObjectSafe = (value: string): Record<string, unknown> | null => {
@@ -261,6 +337,47 @@ export async function handleSpecialGitBridgeMessage(
   const { id, type, payload } = message;
 
   switch (type) {
+    case 'api:git/commit-message': {
+      const { directory, files, providerId, modelId, zenModel: payloadZenModel } = (payload || {}) as {
+        directory?: string;
+        files?: unknown;
+        providerId?: string;
+        modelId?: string;
+        zenModel?: string;
+      };
+      if (!directory) {
+        return { id, type, success: false, error: 'Directory is required' };
+      }
+
+      const selectedFiles = Array.isArray(files)
+        ? files.filter((file): file is string => typeof file === 'string' && file.trim().length > 0)
+        : undefined;
+
+      try {
+        const apiUrl = ctx?.manager?.getApiUrl();
+        if (!apiUrl) {
+          return { id, type, success: false, error: 'OpenCode API unavailable' };
+        }
+
+        const promptOverrides = deps.readPromptOverrides();
+        const generated = await generateBridgeCommitMessage({
+          directory,
+          files: selectedFiles,
+          apiUrl,
+          authHeaders: ctx?.manager?.getOpenCodeAuthHeaders(),
+          settings: deps.readSettings(ctx),
+          visiblePromptOverride: promptOverrides['git.commit.generate.visible'],
+          instructionsPromptOverride: promptOverrides['git.commit.generate.instructions'],
+          payloadModel: { providerId, modelId, zenModel: payloadZenModel },
+          execGit: deps.execGit,
+        });
+        return { id, type, success: true, data: { message: generated } };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { id, type, success: false, error: message };
+      }
+    }
+
     case 'api:git/pr-description': {
       const { directory, base, head, context, providerId, modelId, zenModel: payloadZenModel } = (payload || {}) as {
         directory?: string;
@@ -319,15 +436,16 @@ export async function handleSpecialGitBridgeMessage(
           { providerId, modelId, zenModel: payloadZenModel },
           settings,
           apiUrl,
-          ctx?.manager?.getOpenCodeAuthHeaders()
-        );
-        const raw = await generateBridgeTextWithSessionFlow({
-          apiUrl,
+          ctx?.manager?.getOpenCodeAuthHeaders(),
           directory,
+        );
+        const raw = await generateBridgeGitText({
+          apiUrl,
           prompt,
           providerID,
           modelID,
           authHeaders: ctx?.manager?.getOpenCodeAuthHeaders(),
+          directory,
         });
         if (!raw) {
           return { id, type, success: false, error: 'No PR description returned by generator' };

@@ -3,6 +3,7 @@ import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+import { createProjectIdFromPath, projectConfigFileStemOf } from '../projects/project-id.js';
 import { createAgentMemoryRuntime } from './runtime.js';
 
 const PROJECT_ID = 'path_dGVzdA';
@@ -46,6 +47,27 @@ describe('scope resolution', () => {
     expect((await runtime.read(PROJECT)).entries.map((e) => e.title)).toEqual(['Uses bun']);
     await fsPromises.access(globalPath());
     await fsPromises.access(projectPath());
+  });
+
+  test('a project id too long for a folder name is stored under the bounded stem', async () => {
+    // A checkout nested deep enough that its `path_<base64url>` id is longer
+    // than a folder name may be; the store lands under the bounded stem the
+    // config file and project context use, instead of failing with ENAMETOOLONG.
+    const longProjectId = createProjectIdFromPath(`/private/tmp/claude-501/${'segment-'.repeat(18)}/scratchpad/evidence/demo-repo`);
+    const stem = projectConfigFileStemOf(longProjectId);
+    expect(longProjectId.length).toBeGreaterThan(240);
+    expect(stem.startsWith('path_sha256_')).toBe(true);
+    const target = { scope: 'project', projectId: longProjectId };
+
+    expect((await runtime.read(target)).entries).toEqual([]);
+    await runtime.create(target, { title: 'Uses bun', body: 'Tests run with bun test.' });
+
+    expect((await runtime.read(target)).entries.map((e) => e.title)).toEqual(['Uses bun']);
+    expect((await runtime.readAll(longProjectId)).project.map((e) => e.title)).toEqual(['Uses bun']);
+    await fsPromises.access(path.join(rootDir, 'config', 'projects', stem, 'memory.json'));
+    expect(await fsPromises.readdir(path.join(rootDir, 'config', 'projects'))).toEqual([stem]);
+    // A short id keeps naming its folder itself.
+    expect(runtime.resolveTarget(PROJECT).filePath).toBe(projectPath());
   });
 
   test('rejects an unknown scope', async () => {
@@ -129,11 +151,29 @@ describe('create', () => {
     await expect(runtime.create(GLOBAL, { title: 'x', body: '  ' })).rejects.toThrow('body is required');
   });
 
-  test('clamps oversized fields', async () => {
-    const { entry } = await runtime.create(GLOBAL, { title: 'x'.repeat(300), body: 'y'.repeat(5000) });
+  test('rejects a body over the limit instead of truncating it', async () => {
+    // A silent slice left the agent with a success for a body it never
+    // stored, so an over-limit body must come back as an error, not a trim.
+    await expect(runtime.create(GLOBAL, { title: 'x'.repeat(300), body: 'y'.repeat(2001) }))
+      .rejects.toThrow('body holds at most 2000 characters');
+    expect((await runtime.read(GLOBAL)).entries).toHaveLength(0);
 
-    expect(entry.title).toHaveLength(60);
+    const { entry } = await runtime.create(GLOBAL, { title: 'T', body: 'y'.repeat(2000) });
     expect(entry.body).toHaveLength(2000);
+  });
+
+  test('a legacy over-limit entry still loads, while a new write of that size is rejected', async () => {
+    // Older builds truncated at a shorter limit, and hand-edits can exceed it;
+    // the store must stay loadable, so reads stay tolerant and only writes
+    // enforce the limit.
+    await writeJson(globalPath(), {
+      version: 1,
+      entries: [{ id: 'legacy', title: 'Legacy', body: 'z'.repeat(2500), createdAt: 1, updatedAt: 1 }],
+    });
+    expect((await runtime.read(GLOBAL)).entries[0].body).toHaveLength(2000);
+
+    await expect(runtime.create(GLOBAL, { title: 'Too long', body: 'z'.repeat(2500) }))
+      .rejects.toThrow('body holds at most 2000 characters');
   });
 
   test('the same title updates in place instead of duplicating', async () => {
@@ -330,6 +370,14 @@ describe('user corrections', () => {
 
     await expect(runtime.update(PROJECT, entry.id, { title: '   ' })).rejects.toThrow('title is required');
     await expect(runtime.update(PROJECT, entry.id, { body: '   ' })).rejects.toThrow('body is required');
+  });
+
+  test('rejects an over-limit body instead of truncating it', async () => {
+    const { entry } = await runtime.create(PROJECT, { title: 'T', body: 'b' });
+
+    await expect(runtime.update(PROJECT, entry.id, { body: 'y'.repeat(2001) }))
+      .rejects.toThrow('body holds at most 2000 characters');
+    expect((await runtime.read(PROJECT)).entries[0].body).toBe('b');
   });
 
   test('rejects an empty patch', async () => {

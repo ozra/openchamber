@@ -1,9 +1,11 @@
 import type React from 'react';
 import { isDesktopShell } from '@/lib/desktop';
-import { isMacOS } from '@/lib/utils';
+import { isMacOS, isWindows } from '@/lib/utils';
 
-type ShortcutModifier = 'mod' | 'shift' | 'alt' | 'ctrl';
-type ShortcutDisplayPlatform = 'macos' | 'other';
+// `mod` is Command on macOS and Control elsewhere. `super` is the Windows /
+// Super key on Windows and Linux; macOS has no such key of its own.
+type ShortcutModifier = 'mod' | 'shift' | 'alt' | 'ctrl' | 'super';
+type ShortcutDisplayPlatform = 'macos' | 'windows' | 'other';
 type ShortcutKey = string;
 
 export type ShortcutCombo = string;
@@ -29,6 +31,8 @@ const MODIFIER_KEY_MAP: Record<string, ShortcutModifier> = {
   meta: 'mod',
   cmd: 'mod',
   command: 'mod',
+  super: 'super',
+  win: 'super',
 };
 
 const MODIFIER_LABELS: Record<ShortcutDisplayPlatform, Record<ShortcutModifier, string>> = {
@@ -37,12 +41,21 @@ const MODIFIER_LABELS: Record<ShortcutDisplayPlatform, Record<ShortcutModifier, 
     shift: '⇧',
     alt: '⌥',
     ctrl: '⌃',
+    super: 'Super',
+  },
+  windows: {
+    mod: 'Ctrl',
+    shift: 'Shift',
+    alt: 'Alt',
+    ctrl: 'Ctrl',
+    super: 'Win',
   },
   other: {
     mod: 'Ctrl',
     shift: 'Shift',
     alt: 'Alt',
     ctrl: 'Ctrl',
+    super: 'Super',
   },
 };
 
@@ -67,13 +80,14 @@ const KEY_LABEL_MAP: Record<string, string> = {
   minus: '-',
 };
 
-const MODIFIER_PRIORITY: ShortcutModifier[] = ['mod', 'ctrl', 'shift', 'alt'];
+const MODIFIER_PRIORITY: ShortcutModifier[] = ['mod', 'ctrl', 'super', 'shift', 'alt'];
 const RISKY_BROWSER_SHORTCUT_KEYS = new Set(['w', 't', 'r', 'p', 's', 'f', 'l', 'n', 'q', 'd', 'h', 'j', 'o', 'u']);
 const MODIFIER_KEY_ALIASES: Record<ShortcutModifier, readonly string[]> = {
   mod: isMacOS() && isDesktopShell() ? ['meta'] : isMacOS() ? ['meta', 'control'] : ['control'],
   shift: ['shift'],
   alt: ['alt'],
   ctrl: ['control'],
+  super: ['meta'],
 };
 
 const SHIFTED_KEY_BASE_MAP: Record<string, string> = {
@@ -188,7 +202,9 @@ export function parseShortcut(combo: ShortcutCombo): ParsedShortcut | undefined 
 }
 
 function getShortcutDisplayPlatform(): ShortcutDisplayPlatform {
-  return isMacOS() ? 'macos' : 'other';
+  if (isMacOS()) return 'macos';
+  if (isWindows()) return 'windows';
+  return 'other';
 }
 
 export function formatShortcutForDisplay(
@@ -306,6 +322,7 @@ export function eventMatchesShortcut(
   const expectedShift = chord.modifiers.has('shift');
   const expectedAlt = chord.modifiers.has('alt');
   const expectedCtrl = chord.modifiers.has('ctrl');
+  const expectedSuper = chord.modifiers.has('super');
   const isDesktopMac = isMacOS() && isDesktopShell();
   const isMac = isMacOS();
   let modMatches = event.ctrlKey;
@@ -316,7 +333,17 @@ export function eventMatchesShortcut(
   }
 
   if (expectedMod && !modMatches) return false;
-  if (!expectedMod && event.metaKey) return false;
+  if (isMac) {
+    // Meta is Command, the `mod` key; there is no separate Super key.
+    if (expectedSuper) return false;
+    if (!expectedMod && event.metaKey) return false;
+  } else if (expectedSuper !== event.metaKey) {
+    // Elsewhere Meta is the Windows / Super key.
+    return false;
+  }
+  // PRD-031 (fork): `+` needs Shift on most layouts, so a chord written as
+  // `mod+plus` must match the Shift that types it even though it does not name
+  // Shift itself.
   const actualKey = keyToShortcutToken(resolveShortcutEventKey(event));
   const implicitPlusShift = !expectedShift && event.shiftKey && actualKey === 'plus';
   if (expectedShift !== event.shiftKey && !implicitPlusShift) return false;
@@ -328,7 +355,12 @@ export function eventMatchesShortcut(
     if (event.ctrlKey && !ctrlUsedAsMod) return false;
   }
 
-  return actualKey === keyToShortcutToken(chord.key);
+  const expectedKey = keyToShortcutToken(chord.key);
+  // An explicitly configured layout character (for example Ctrl+§) must
+  // remain usable alongside upstream's physical-key fallback for non-Latin
+  // layouts. Modifier checks above still apply to both forms.
+  const explicitLayoutCharacter = expectedKey.length === 1 && expectedKey.charCodeAt(0) > 127;
+  return actualKey === expectedKey || (explicitLayoutCharacter && keyToShortcutToken(event.key) === expectedKey);
 }
 
 export function isShortcutPrefixHeld(prefixCombo: ShortcutCombo, heldKeys: ReadonlySet<string>): boolean {

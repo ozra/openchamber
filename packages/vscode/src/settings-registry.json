@@ -21,6 +21,9 @@
       "scope": "profile",
       "perSurface": true
     },
+    "locale": {
+      "scope": "profile"
+    },
     "lastDirectory": {
       "scope": "instance",
       "adopt": "bootstrap-only"
@@ -71,6 +74,12 @@
         "desktop"
       ]
     },
+    "desktopLinuxNativeFrame": {
+      "scope": "instance",
+      "surfaces": [
+        "desktop"
+      ]
+    },
     "desktopUiPassword": {
       "scope": "instance",
       "surfaces": [
@@ -105,6 +114,9 @@
     "githubScopes": {
       "scope": "instance"
     },
+    "gitlabClientId": {
+      "scope": "instance"
+    },
     "skillCatalogs": {
       "scope": "instance"
     },
@@ -114,16 +126,71 @@
     "permissionAutoAccept": {
       "scope": "instance"
     },
+    "permissionDefaultMode": {
+      "scope": "instance",
+      "surfaces": [
+        "web",
+        "desktop",
+        "mobile"
+      ]
+    },
+    "messageSearchEnabled": {
+      "scope": "instance",
+      "surfaces": [
+        "web",
+        "desktop",
+        "mobile"
+      ]
+    },
+    "messageSearchReasoningEnabled": {
+      "scope": "instance",
+      "surfaces": [
+        "web",
+        "desktop",
+        "mobile"
+      ]
+    },
     "agentControlToolEnabled": {
+      "scope": "instance"
+    },
+    "agentScheduleToolEnabled": {
       "scope": "instance"
     },
     "agentWebToolEnabled": {
       "scope": "instance"
     },
+    "browserProvider": {
+      "scope": "instance"
+    },
+    "agentNotifyToolEnabled": {
+      "scope": "instance"
+    },
+    "agentRenderToolEnabled": {
+      "scope": "instance"
+    },
+    "agentToolsCodeMode": {
+      "scope": "instance"
+    },
     "agentMemoryToolEnabled": {
       "scope": "instance"
     },
+    "agentKnowledgeToolEnabled": {
+      "scope": "instance"
+    },
+    "isolatedSpacesEnabled": {
+      "scope": "instance"
+    },
+    "isolatedSpacesIdleStop": {
+      "scope": "instance"
+    },
+    "isolatedSpacesSshHost": {
+      "scope": "instance"
+    },
     "agentMemoryFeatureAvailable": {
+      "scope": "instance",
+      "computed": true
+    },
+    "routingFeatureAvailable": {
       "scope": "instance",
       "computed": true
     },
@@ -136,7 +203,13 @@
     "autoDeleteAfterDays": {
       "scope": "instance"
     },
+    "sessionRetentionOnlyArchived": {
+      "scope": "instance"
+    },
     "sessionRetentionAction": {
+      "scope": "instance"
+    },
+    "mergedWorktreeCleanupEnabled": {
       "scope": "instance"
     },
     "terminalShell": {
@@ -205,22 +278,40 @@
     "sidebarProjectDisplayMode": {
       "scope": "profile"
     },
-    "sidebarSessionGroupingMode": {
-      "scope": "profile"
+    "sidebarViewMode": {
+      "scope": "profile",
+      "perSurface": true
+    },
+    "sidebarListSessionGrouping": {
+      "scope": "profile",
+      "perSurface": true
     },
     "sidebarProjectSortOrder": {
       "scope": "profile"
     },
-    "sidebarShowRecentSection": {
+    "sidebarWorktreeSortOrder": {
       "scope": "profile"
+    },
+    "sidebarShowChatsSection": {
+      "scope": "profile",
+      "perSurface": true
+    },
+    "sidebarShowWorkSection": {
+      "scope": "profile",
+      "perSurface": true
+    },
+    "sidebarShowPinnedSection": {
+      "scope": "profile",
+      "perSurface": true
+    },
+    "sidebarDetailedZoneRows": {
+      "scope": "profile",
+      "perSurface": true
     },
     "sidebarKeepOpen": {
       "scope": "profile"
     },
-    "sidebarHideHeaderNewSession": {
-      "scope": "profile"
-    },
-    "sidebarActionsAlwaysVisible": {
+    "workStatusSectionOrder": {
       "scope": "profile"
     },
     "workStatusPanelEnabled": {
@@ -240,6 +331,9 @@
       "perSurface": true
     },
     "collapsibleThinkingBlocks": {
+      "scope": "profile"
+    },
+    "expandReasoningWhileStreaming": {
       "scope": "profile"
     },
     "showTextJustificationActivity": {
@@ -281,13 +375,13 @@
     "codeBlockLineWrap": {
       "scope": "profile"
     },
+    "tableCellWrap": {
+      "scope": "profile"
+    },
+    "copyMessagesAsPlainText": {
+      "scope": "profile"
+    },
     "showTurnChangedFiles": {
-      "scope": "profile"
-    },
-    "showExpandedBashTools": {
-      "scope": "profile"
-    },
-    "showExpandedEditTools": {
       "scope": "profile"
     },
     "toolJsonViewMode": {
@@ -308,6 +402,9 @@
     "diffWrapLines": {
       "scope": "profile"
     },
+    "diffHideWhitespace": {
+      "scope": "profile"
+    },
     "gitChangesViewMode": {
       "scope": "profile"
     },
@@ -326,8 +423,48 @@
     "fileEditorKeymap": {
       "scope": "profile"
     },
+    "fileEditorVimMappings": {
+      "scope": "profile"
+    },
     "autoSaveEnabled": {
       "scope": "profile"
+    },
+    "confirmFileTreeMove": {
+      "scope": "profile"
+    },
+    "fileTreeSide": {
+      "scope": "profile",
+      "surfaces": [
+        "web",
+        "desktop"
+      ]
+    },
+    "layoutAnimations": {
+      "scope": "profile",
+      "surfaces": [
+        "web",
+        "desktop"
+      ]
+    },
+    "openLinksInBrowserPanel": {
+      "scope": "profile",
+      "surfaces": [
+        "desktop"
+      ]
+    },
+    "liveBrowserTabLimit": {
+      "scope": "profile",
+      "surfaces": [
+        "desktop"
+      ]
+    },
+    "openTrackerLinksOnBoard": {
+      "scope": "profile",
+      "surfaces": [
+        "web",
+        "desktop",
+        "mobile"
+      ]
     },
     "autoCreateWorktree": {
       "scope": "profile"
@@ -339,9 +476,6 @@
         "desktop",
         "vscode"
       ]
-    },
-    "showOpenCodeRestartConfirm": {
-      "scope": "profile"
     },
     "allowPromptingSubagentSessions": {
       "scope": "profile"
@@ -362,6 +496,9 @@
       "scope": "profile"
     },
     "largeTextPasteBehavior": {
+      "scope": "profile"
+    },
+    "savePastedImagesAsFiles": {
       "scope": "profile"
     },
     "followUpBehavior": {
@@ -406,6 +543,12 @@
     "monoFont": {
       "scope": "profile"
     },
+    "customUiFont": {
+      "scope": "profile"
+    },
+    "customMonoFont": {
+      "scope": "profile"
+    },
     "padding": {
       "scope": "profile",
       "perSurface": true
@@ -447,10 +590,19 @@
     "collapsedModelProviders": {
       "scope": "profile"
     },
+    "customProviderIcons": {
+      "scope": "profile"
+    },
     "recentModels": {
       "scope": "profile"
     },
+    "lastSelectedModel": {
+      "scope": "profile"
+    },
     "recentAgents": {
+      "scope": "profile"
+    },
+    "favoriteAgents": {
       "scope": "profile"
     },
     "recentEfforts": {
@@ -465,8 +617,35 @@
     "sessionSuggestionEnabled": {
       "scope": "profile"
     },
+    "sessionWorkEnabled": {
+      "scope": "profile"
+    },
+    "sessionReviewOfferEnabled": {
+      "scope": "profile",
+      "surfaces": [
+        "web",
+        "desktop",
+        "mobile"
+      ]
+    },
     "sessionGoalEnabled": {
       "scope": "profile"
+    },
+    "sessionGoalChecker": {
+      "scope": "profile",
+      "surfaces": [
+        "web",
+        "desktop",
+        "mobile"
+      ]
+    },
+    "sessionGoalMaxAutoTurns": {
+      "scope": "profile",
+      "surfaces": [
+        "web",
+        "desktop",
+        "mobile"
+      ]
     },
     "sessionGoalDefaultBudgetEnabled": {
       "scope": "profile"
@@ -546,9 +725,6 @@
     "responseStyleCustomInstructions": {
       "scope": "profile"
     },
-    "optimizeSystemPrompt": {
-      "scope": "profile"
-    },
     "pwaAppName": {
       "scope": "instance",
       "surfaces": [
@@ -610,7 +786,23 @@
       "scope": "device",
       "local": true
     },
+    "mobileWorkspaceTabOrder": {
+      "scope": "device",
+      "local": true
+    },
+    "mobileWorkspaceHiddenTabs": {
+      "scope": "device",
+      "local": true
+    },
+    "contextSurfaceZones": {
+      "scope": "device",
+      "local": true
+    },
     "contextEditorTreeVisible": {
+      "scope": "device",
+      "local": true
+    },
+    "contextEditorVisible": {
       "scope": "device",
       "local": true
     },
@@ -618,11 +810,11 @@
       "scope": "device",
       "local": true
     },
-    "notesPanelHeight": {
+    "workStatusExpandedSections": {
       "scope": "device",
       "local": true
     },
-    "workStatusExpandedSections": {
+    "messageQueueExpanded": {
       "scope": "device",
       "local": true
     },
@@ -670,19 +862,11 @@
       "scope": "device",
       "local": true
     },
-    "linearIssueListStatus": {
+    "diffFileListMode": {
       "scope": "device",
       "local": true
     },
-    "linearIssueListAssignee": {
-      "scope": "device",
-      "local": true
-    },
-    "linearIssueListTeamIdByRuntime": {
-      "scope": "device",
-      "local": true
-    },
-    "linearIssueListPriority": {
+    "diffFileTreeWidth": {
       "scope": "device",
       "local": true
     },
@@ -699,10 +883,6 @@
       "local": true
     },
     "agentMemoryViewedAt": {
-      "scope": "device",
-      "local": true
-    },
-    "projectContextSidebarWidth": {
       "scope": "device",
       "local": true
     },

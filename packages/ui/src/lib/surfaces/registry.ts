@@ -1,26 +1,33 @@
 import type { IconName } from '@/components/icon/icons';
 import type { I18nKey } from '@/lib/i18n';
-import type { ContextPanelMode } from '@/stores/useUIStore';
+import {
+  isPluginContextPanelMode,
+  type ContextPanelMode,
+} from '@/lib/surfaces/modes';
 
-export type ContextSurfaceId =
+type BuiltInContextSurfaceId =
   | 'editor'
   | 'git'
   | 'pr'
-  | 'linear'
   | 'diff'
   | 'walkthrough'
   | 'terminal'
-  | 'plan'
   | 'notes'
   | 'context'
   | 'browser'
   | 'chat';
+
+export type ContextSurfaceId = BuiltInContextSurfaceId | `plugin:${string}`;
 
 export type ContextSurfaceDescriptor = {
   id: ContextSurfaceId;
   /** The context panel tab mode this surface activates. 1:1 in the current model. */
   mode: ContextPanelMode;
   icon: IconName;
+  /** Authenticated package SVG for a guest rail mark. Prefer over `icon` when set. */
+  iconSrc?: string;
+  /** Guest-provided name. When set, the rail prefers this over `labelKey`. */
+  label?: string;
   labelKey: I18nKey;
   /**
    * 'always' surfaces can be opened empty from the rail.
@@ -32,17 +39,28 @@ export type ContextSurfaceDescriptor = {
   /** Short tooltip explanation shown on the rail. */
   descriptionKey: I18nKey;
   /**
-   * Default panel width as a fraction of the available content area, used
-   * until the user manually resizes this surface.
+   * Which of the two default widths the panel opens at until the user resizes
+   * this surface. The panel never takes more than the chat area leaves after
+   * a minimum chat column, so a small window shows it narrower.
    */
-  defaultWidthFraction: number;
+  width: ContextSurfaceWidth;
 };
+
+/** Default panel widths in px. Every surface, built-in or guest, uses one. */
+export const CONTEXT_SURFACE_WIDTHS = {
+  // Code side by side with the chat: files, diffs, the terminal, the walkthrough.
+  wide: 640,
+  // A list or a card: every other surface, guest panels included.
+  regular: 540,
+} as const;
+
+type ContextSurfaceWidth = keyof typeof CONTEXT_SURFACE_WIDTHS;
 
 export const CONTEXT_SURFACES: readonly ContextSurfaceDescriptor[] = [
   {
     id: 'context',
     descriptionKey: 'contextRail.surface.context.description',
-    defaultWidthFraction: 0.45,
+    width: 'regular',
     mode: 'context',
     icon: 'donut-chart-fill',
     labelKey: 'contextPanel.mode.context',
@@ -51,7 +69,7 @@ export const CONTEXT_SURFACES: readonly ContextSurfaceDescriptor[] = [
   {
     id: 'git',
     descriptionKey: 'contextRail.surface.git.description',
-    defaultWidthFraction: 2 / 5,
+    width: 'regular',
     mode: 'git',
     icon: 'git-branch',
     labelKey: 'layout.rightSidebar.git',
@@ -60,7 +78,7 @@ export const CONTEXT_SURFACES: readonly ContextSurfaceDescriptor[] = [
   {
     id: 'pr',
     descriptionKey: 'contextRail.surface.pr.description',
-    defaultWidthFraction: 0.45,
+    width: 'regular',
     mode: 'pr',
     icon: 'github',
     labelKey: 'contextPanel.mode.pr',
@@ -69,7 +87,7 @@ export const CONTEXT_SURFACES: readonly ContextSurfaceDescriptor[] = [
   {
     id: 'diff',
     descriptionKey: 'contextRail.surface.diff.description',
-    defaultWidthFraction: 3 / 5,
+    width: 'wide',
     mode: 'diff',
     icon: 'arrow-left-right',
     labelKey: 'contextPanel.mode.diff',
@@ -78,25 +96,16 @@ export const CONTEXT_SURFACES: readonly ContextSurfaceDescriptor[] = [
   {
     id: 'walkthrough',
     descriptionKey: 'contextRail.surface.walkthrough.description',
-    defaultWidthFraction: 3 / 5,
+    width: 'wide',
     mode: 'walkthrough',
     icon: 'route',
     labelKey: 'contextPanel.mode.walkthrough',
     availability: 'always',
   },
   {
-    id: 'linear',
-    descriptionKey: 'contextRail.surface.linear.description',
-    defaultWidthFraction: 0.45,
-    mode: 'linear',
-    icon: 'linear',
-    labelKey: 'contextPanel.mode.linear',
-    availability: 'always',
-  },
-  {
     id: 'editor',
     descriptionKey: 'contextRail.surface.editor.description',
-    defaultWidthFraction: 3 / 5,
+    width: 'wide',
     mode: 'file',
     icon: 'file-edit',
     labelKey: 'contextPanel.mode.files',
@@ -105,7 +114,7 @@ export const CONTEXT_SURFACES: readonly ContextSurfaceDescriptor[] = [
   {
     id: 'terminal',
     descriptionKey: 'contextRail.surface.terminal.description',
-    defaultWidthFraction: 3 / 5,
+    width: 'wide',
     mode: 'terminal',
     icon: 'terminal-box',
     labelKey: 'layout.mainTab.terminal',
@@ -114,28 +123,16 @@ export const CONTEXT_SURFACES: readonly ContextSurfaceDescriptor[] = [
   {
     id: 'notes',
     descriptionKey: 'contextRail.surface.notes.description',
-    // As wide as the files surface: this panel now carries a sidebar and a
-    // content column, and a third of the window leaves the content column too
-    // narrow to read a note in.
-    defaultWidthFraction: 3 / 5,
+    width: 'regular',
     mode: 'notes',
     icon: 'book-marked',
     labelKey: 'contextRail.surface.notes',
     availability: 'always',
   },
   {
-    id: 'plan',
-    descriptionKey: 'contextRail.surface.plan.description',
-    defaultWidthFraction: 0.45,
-    mode: 'plan',
-    icon: 'file-text',
-    labelKey: 'contextPanel.mode.plan',
-    availability: 'always',
-  },
-  {
     id: 'browser',
     descriptionKey: 'contextRail.surface.browser.description',
-    defaultWidthFraction: 0.45,
+    width: 'regular',
     mode: 'browser',
     icon: 'global',
     labelKey: 'contextPanel.mode.browser',
@@ -144,7 +141,7 @@ export const CONTEXT_SURFACES: readonly ContextSurfaceDescriptor[] = [
   {
     id: 'chat',
     descriptionKey: 'contextRail.surface.chat.description',
-    defaultWidthFraction: 0.45,
+    width: 'regular',
     mode: 'chat',
     icon: 'chat-4',
     labelKey: 'contextPanel.mode.chat',
@@ -152,41 +149,46 @@ export const CONTEXT_SURFACES: readonly ContextSurfaceDescriptor[] = [
   },
 ];
 
-const SURFACE_BY_ID = new Map(CONTEXT_SURFACES.map((surface) => [surface.id, surface]));
-const FRACTION_BY_MODE = new Map(CONTEXT_SURFACES.map((surface) => [surface.mode, surface.defaultWidthFraction]));
+const WIDTH_BY_MODE = new Map(CONTEXT_SURFACES.map((surface) => [surface.mode, surface.width]));
 
 // Tablet width and up: below this the walkthrough cannot show a stop and its
 // code side by side, which is the whole point of the surface.
 export const WALKTHROUGH_MIN_WIDTH = 768;
 
-export const getContextSurfaceWidthFraction = (mode: ContextPanelMode): number => {
-  return FRACTION_BY_MODE.get(mode) ?? 1 / 2;
+export const getContextSurfaceDefaultWidth = (mode: ContextPanelMode): number => {
+  // Guest panels and any unlisted mode open at the regular width.
+  return CONTEXT_SURFACE_WIDTHS[WIDTH_BY_MODE.get(mode) ?? 'regular'];
 };
 
-const isContextSurfaceId = (value: unknown): value is ContextSurfaceId => {
-  return typeof value === 'string' && SURFACE_BY_ID.has(value as ContextSurfaceId);
+const isKnownSurfaceId = (value: string, byId: ReadonlyMap<string, ContextSurfaceDescriptor>): boolean => {
+  return byId.has(value);
 };
 
 /**
  * Applies a persisted user reorder on top of the default registry order:
  * unknown ids are dropped, missing surfaces are appended in default order.
  */
-export const sortContextSurfaces = (railOrder: readonly string[]): ContextSurfaceDescriptor[] => {
+export const sortContextSurfaces = (
+  railOrder: readonly string[],
+  extras: readonly ContextSurfaceDescriptor[] = [],
+): ContextSurfaceDescriptor[] => {
+  const all = extras.length === 0 ? CONTEXT_SURFACES : [...CONTEXT_SURFACES, ...extras];
+  const byId = new Map<string, ContextSurfaceDescriptor>(all.map((surface) => [surface.id, surface]));
   const ordered: ContextSurfaceDescriptor[] = [];
-  const seen = new Set<ContextSurfaceId>();
+  const seen = new Set<string>();
 
   for (const id of railOrder) {
-    if (!isContextSurfaceId(id) || seen.has(id)) {
+    if (!isKnownSurfaceId(id, byId) || seen.has(id)) {
       continue;
     }
-    const surface = SURFACE_BY_ID.get(id);
+    const surface = byId.get(id);
     if (surface) {
       seen.add(id);
       ordered.push(surface);
     }
   }
 
-  for (const surface of CONTEXT_SURFACES) {
+  for (const surface of all) {
     if (!seen.has(surface.id)) {
       ordered.push(surface);
     }
@@ -200,16 +202,17 @@ type VisibleRailSurfacesOptions = {
   /** Surfaces the user chose to hide from the rail (and from the digit
       shortcuts, which share this filter). */
   hiddenSurfaces?: readonly string[];
-  planModeEnabled: boolean;
   isVSCode: boolean;
   screenWidth: number;
-  tabs: readonly { mode: ContextPanelMode }[];
-  /** Linear's rail icon stays off until a workspace is connected. */
-  linearConnected: boolean;
-  /** The pull-request rail icon stays off until GitHub is connected (OAuth
-      or a detected `gh` CLI login). GitHub is connected from Settings, so
-      hiding the surface removes no entry point. */
-  githubConnected: boolean;
+  tabs: readonly { mode: ContextPanelMode; targetPath?: string | null }[];
+  /** The Tracker rail icon stays off until a GitHub or GitLab account is
+      connected (OAuth, a token, or a detected `gh`/`glab` login), or an item
+      such as a Linear issue is open in it. Accounts are connected from
+      Settings, so hiding the surface removes no entry point. */
+  sourceControlConnected: boolean;
+  /** Installed guest panels. Empty on VS Code and when the catalog has not
+      loaded or failed. */
+  extras?: readonly ContextSurfaceDescriptor[];
 };
 
 /**
@@ -221,11 +224,11 @@ type VisibleRailSurfacesOptions = {
  * existing tab keeps them visible even if the content source went away.
  */
 export const getVisibleContextRailSurfaces = (options: VisibleRailSurfacesOptions): ContextSurfaceDescriptor[] => {
-  return sortContextSurfaces(options.railOrder).filter((surface) => {
+  return sortContextSurfaces(options.railOrder, options.extras).filter((surface) => {
     if (options.hiddenSurfaces?.includes(surface.id)) {
       return false;
     }
-    if (surface.id === 'plan' && !options.planModeEnabled) {
+    if (isPluginContextPanelMode(surface.mode) && options.isVSCode) {
       return false;
     }
     // The walkthrough needs room for a stop list beside real code, and its
@@ -241,10 +244,8 @@ export const getVisibleContextRailSurfaces = (options: VisibleRailSurfacesOption
     if (surface.id === 'browser' && options.isVSCode) {
       return false;
     }
-    if (surface.id === 'linear' && !options.linearConnected) {
-      return false;
-    }
-    if (surface.id === 'pr' && !options.githubConnected) {
+    if (surface.id === 'pr' && !options.sourceControlConnected
+      && !options.tabs.some((tab) => tab.mode === 'pr' && tab.targetPath)) {
       return false;
     }
     if (surface.availability === 'has-content') {

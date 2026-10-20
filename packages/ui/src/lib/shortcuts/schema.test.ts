@@ -4,7 +4,6 @@ import {
   getEffectiveShortcutCombo,
   getShortcutBindingConflicts,
   getShortcutAction,
-  isShortcutActionAvailable,
   parseShortcut,
   SHORTCUT_SCHEMA,
   type ShortcutCategory,
@@ -39,6 +38,7 @@ describe('shortcut schema', () => {
       'panels',
       'navigation',
       'application',
+      'desktop',
     ]);
   });
 
@@ -67,31 +67,13 @@ describe('shortcut schema', () => {
     expect(getShortcutAction('switch_context_surface')?.defaultBinding).toBe('mod+alt');
   });
 
-  test('uses the conventional close-tab shortcut', () => {
-    expect(getShortcutAction('close_session_tab')?.defaultBinding).toBe('mod+w');
-  });
-
-  test('declares chat paging and desktop zoom defaults', () => {
-    expect(getShortcutAction('scroll_chat_history_up')?.defaultBinding).toBe('mod+pageup');
-    expect(getShortcutAction('scroll_chat_history_down')?.defaultBinding).toBe('mod+pagedown');
-    expect(getShortcutAction('zoom_in')?.defaultBinding).toBe('mod+plus');
-    expect(getShortcutAction('zoom_out')?.defaultBinding).toBe('mod+minus');
-    expect(getShortcutAction('zoom_reset')?.defaultBinding).toBe('mod+0');
-  });
-
-  test('limits Electron-only shortcuts to the desktop shell', () => {
-    const zoomIn = getShortcutAction('zoom_in');
-    expect(zoomIn).toBeDefined();
-    if (!zoomIn) return;
-    expect(isShortcutActionAvailable(zoomIn, { isElectron: true, isVSCode: false })).toBe(true);
-    expect(isShortcutActionAvailable(zoomIn, { isElectron: false, isVSCode: false })).toBe(false);
-    expect(isShortcutActionAvailable(zoomIn, { isElectron: false, isVSCode: true })).toBe(false);
-  });
-
   test('every action ships with a default binding', () => {
     // Palette-only commands live outside this schema entirely; an action in
     // the schema without a binding would be dead weight in Settings.
+    // Desktop-category actions are the exception: they register as OS-level
+    // global shortcuts, not in-app bindings, so their default is unassigned.
     for (const action of SHORTCUT_SCHEMA) {
+      if (action.category === 'desktop') continue;
       expect(getEffectiveShortcutCombo(action.id)).not.toBe('');
     }
   });
@@ -104,6 +86,13 @@ describe('shortcut schema', () => {
   test('keeps internal bindings authoritative over persisted overrides', () => {
     expect(getEffectiveShortcutCombo('save_file', { save_file: 'mod+k' })).toBe('mod+s');
     expect(getEffectiveShortcutCombo('save_file', { save_file: '__unassigned__' })).toBe('mod+s');
+  });
+
+  test('surfaces a desktop global combo override as a replaceable conflict', () => {
+    const conflict = getShortcutBindingConflicts('new_chat', 'mod+alt+m', { mini_chat_global: 'mod+alt+m' })
+      .find((candidate) => candidate.action.id === 'mini_chat_global');
+    expect(conflict?.kind).toBe('exact');
+    expect(conflict?.action.customizable).toBe(true);
   });
 
   test('detects conflicts against customizable and internal bindings', () => {

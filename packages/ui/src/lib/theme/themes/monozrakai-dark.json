@@ -148,25 +148,23 @@
       "divider": "#343528"
     },
     "tools": {
-      "background": "#2B2A2280",
       "border": "#4d4f3c80",
-      "headerHover": "#292A23",
       "icon": "#C5C5C0",
       "title": "#F8F8F2",
       "description": "#C5C5C0",
       "edit": {
-        "added": "#A6E22E",
         "addedBackground": "#A6E22E25",
-        "removed": "#bd215a",
         "removedBackground": "#F9267225",
         "lineNumber": "#505142"
       },
       "labels": {
         "bash": "#F92672",
+        "shell": "#F92672",
         "write": "#F92672",
         "edit": "#F92672",
         "multiedit": "#F92672",
         "apply-patch": "#F92672",
+        "patch": "#F92672",
         "todowrite": "#FD971F",
         "todoread": "#A6E22E",
         "read": "#A6E22E",
@@ -177,6 +175,7 @@
         "webfetch": "#66D9EF",
         "websearch": "#66D9EF",
         "task": "#AE81FF",
+        "subagent": "#AE81FF",
         "skill": "#AE81FF",
         "question": "#AE81FF",
         "thinking": "#C8986A"

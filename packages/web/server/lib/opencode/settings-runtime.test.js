@@ -1,12 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import crypto from 'crypto';
 import fsPromises from 'fs/promises';
 import os from 'os';
 import path from 'path';
-import { createProjectIdFromPath } from '../projects/project-id.js';
+import { createProjectIdFromPath, projectConfigFileStemOf } from '../projects/project-id.js';
 import { createSettingsRuntime } from './settings-runtime.js';
 
-const createRuntime = async ({ mergePersistedSettings = (_current, changes) => changes } = {}) => {
+const createRuntime = async ({
+  mergePersistedSettings = (_current, changes) => changes,
+  onManagedPluginSettingsChanged = undefined,
+  onPermissionDefaultModeChanged = undefined,
+  onLastDirectoryChanged = undefined,
+  chatRoots = undefined,
+} = {}) => {
   const tempRoot = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'oc-settings-runtime-'));
   const settingsFilePath = path.join(tempRoot, 'settings.json');
   const runtime = createSettingsRuntime({
@@ -26,6 +32,10 @@ const createRuntime = async ({ mergePersistedSettings = (_current, changes) => c
     normalizeManagedRemoteTunnelPresetTokens: (value) => value,
     syncManagedRemoteTunnelConfigWithPresets: async () => {},
     upsertManagedRemoteTunnelToken: async () => {},
+    chatRoots,
+    onManagedPluginSettingsChanged,
+    onPermissionDefaultModeChanged,
+    onLastDirectoryChanged,
   });
 
   return {
@@ -39,6 +49,139 @@ const createRuntime = async ({ mergePersistedSettings = (_current, changes) => c
 };
 
 describe('settings runtime', () => {
+  it('reports the directory the UI moved to, once per change', async () => {
+    const onLastDirectoryChanged = vi.fn();
+    const { runtime, cleanup } = await createRuntime({
+      mergePersistedSettings: (current, changes) => ({ ...current, ...changes }),
+      onLastDirectoryChanged,
+    });
+    try {
+      await runtime.persistSettings({ lastDirectory: '/work/a' });
+      await runtime.persistSettings({ lastDirectory: '/work/a' });
+      await runtime.persistSettings({ lightThemeId: 'flexoki-light' });
+      await runtime.persistSettings({ lastDirectory: '/work/b' });
+      expect(onLastDirectoryChanged.mock.calls).toEqual([['/work/a'], ['/work/b']]);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('refreshes the managed OpenCode config only when a managed plugin setting changed', async () => {
+    const onManagedPluginSettingsChanged = vi.fn(async () => {});
+    const { runtime, cleanup } = await createRuntime({ onManagedPluginSettingsChanged });
+    try {
+      await runtime.persistSettings({ lightThemeId: 'flexoki-light' });
+      expect(onManagedPluginSettingsChanged).not.toHaveBeenCalled();
+
+      await runtime.persistSettings({ agentWebToolEnabled: false });
+      expect(onManagedPluginSettingsChanged).toHaveBeenCalledTimes(1);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('tells the running spaces the default permission mode only when it changed, once it is written', async () => {
+    const seen = [];
+    let settingsFilePath = '';
+    const { runtime, cleanup, settingsFilePath: filePath } = await createRuntime({
+      onPermissionDefaultModeChanged: async (mode) => {
+        seen.push([mode, JSON.parse(await fsPromises.readFile(settingsFilePath, 'utf8')).permissionDefaultMode]);
+      },
+    });
+    settingsFilePath = filePath;
+    try {
+      await runtime.persistSettings({ lightThemeId: 'flexoki-light' });
+      await runtime.persistSettings({ permissionDefaultMode: 'auto' });
+      await runtime.persistSettings({ permissionDefaultMode: 'auto' });
+      await vi.waitFor(() => expect(seen).toEqual([['auto', 'auto']]));
+      await runtime.persistSettings({ permissionDefaultMode: 'ask' });
+      await vi.waitFor(() => expect(seen).toEqual([['auto', 'auto'], ['ask', 'ask']]));
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('still answers the settings write when the managed config refresh fails', async () => {
+    const onManagedPluginSettingsChanged = vi.fn(async () => { throw new Error('disk full'); });
+    const { runtime, cleanup } = await createRuntime({ onManagedPluginSettingsChanged });
+    try {
+      await expect(runtime.persistSettings({ agentMemoryToolEnabled: true }))
+        .resolves.toMatchObject({ agentMemoryToolEnabled: true });
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('round-trips both archived-only retention states through instance settings', async () => {
+    const { runtime, settingsFilePath, cleanup } = await createRuntime();
+    try {
+      for (const sessionRetentionOnlyArchived of [true, false]) {
+        const settings = { sessionRetentionOnlyArchived, sessionRetentionAction: 'delete', autoDeleteAfterDays: 30 };
+        await runtime.persistSettings(settings);
+        expect(await runtime.readSettingsFromDisk()).toEqual(settings);
+        expect(JSON.parse(await fsPromises.readFile(settingsFilePath, 'utf8'))).toEqual(settings);
+      }
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('keeps scheduling off for someone who had switched the control tool off', async () => {
+    const { runtime, cleanup } = await createRuntime();
+    try {
+      await runtime.persistSettings({ agentControlToolEnabled: false });
+      expect(await runtime.readSettingsFromDiskMigrated()).toMatchObject({ agentControlToolEnabled: false, agentScheduleToolEnabled: false });
+
+      // A choice made after the split stays.
+      await runtime.persistSettings({ agentControlToolEnabled: false, agentScheduleToolEnabled: true });
+      expect((await runtime.readSettingsFromDiskMigrated()).agentScheduleToolEnabled).toBe(true);
+
+      await runtime.persistSettings({ agentControlToolEnabled: true });
+      expect(await runtime.readSettingsFromDiskMigrated()).not.toHaveProperty('agentScheduleToolEnabled');
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('turns a stored last directory into a project only while one is stored', async () => {
+    const { runtime, tempRoot, cleanup } = await createRuntime();
+    try {
+      const directory = path.join(tempRoot, 'removed-project');
+      await fsPromises.mkdir(directory);
+      // The legacy migration: no projects, a last directory on disk.
+      await runtime.writeSettingsToDisk({ projects: [], lastDirectory: directory });
+      expect((await runtime.readSettingsFromDiskMigrated()).projects).toEqual([
+        expect.objectContaining({ path: directory }),
+      ]);
+      // Removing the last project forgets the last directory with ''.
+      await runtime.writeSettingsToDisk({ projects: [], lastDirectory: '' });
+      expect((await runtime.readSettingsFromDiskMigrated()).projects).toEqual([]);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('never turns a chat folder stored as the last directory into a project', async () => {
+    const tempRoot = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'oc-settings-chats-'));
+    const chatsRoot = path.join(tempRoot, 'chats');
+    const { runtime, cleanup } = await createRuntime({ chatRoots: [chatsRoot] });
+    try {
+      const chat = path.join(chatsRoot, '2026-10-12', 'session-a');
+      await fsPromises.mkdir(chat, { recursive: true });
+      await runtime.writeSettingsToDisk({ projects: [], lastDirectory: chat });
+      expect((await runtime.readSettingsFromDiskMigrated()).projects).toEqual([]);
+
+      // The same folder reached through a link to the chats root.
+      const alias = path.join(tempRoot, 'chats-alias');
+      await fsPromises.symlink(chatsRoot, alias, 'junction');
+      await runtime.writeSettingsToDisk({ projects: [], lastDirectory: path.join(alias, '2026-10-12', 'session-a') });
+      expect((await runtime.readSettingsFromDiskMigrated()).projects).toEqual([]);
+    } finally {
+      await cleanup();
+      await fsPromises.rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it('uses OpenChamber themes when a new install has no theme preferences', async () => {
     const { runtime, cleanup } = await createRuntime();
     try {
@@ -72,9 +215,9 @@ describe('settings runtime', () => {
     const { runtime, settingsFilePath, tempRoot, cleanup } = await createRuntime();
     const preferences = {
       sidebarProjectDisplayMode: 'single',
-      sidebarSessionGroupingMode: 'flat',
+      sidebarViewMode: 'timeline',
       sidebarProjectSortOrder: 'date-added',
-      sidebarShowRecentSection: false,
+      sidebarShowChatsSection: false,
     };
     try {
       await runtime.persistSettings(preferences);
@@ -145,6 +288,52 @@ describe('settings runtime', () => {
     }
   });
 
+  it('migrates a legacy id into the bounded file of a project whose path is too long for a file name', async () => {
+    const { runtime, settingsFilePath, tempRoot, cleanup } = await createRuntime();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const projectPath = path.join(tempRoot, 'a'.repeat(160));
+      const oldProjectId = 'legacy-project-id';
+      const newProjectId = createProjectIdFromPath(projectPath);
+      expect(newProjectId.length).toBeGreaterThan(200);
+      const projectsRoot = path.join(path.dirname(settingsFilePath), 'projects');
+      const boundedPath = path.join(projectsRoot, `${projectConfigFileStemOf(newProjectId)}.json`);
+      expect(path.basename(boundedPath).startsWith('path_sha256_')).toBe(true);
+
+      await fsPromises.mkdir(projectPath, { recursive: true });
+      await fsPromises.mkdir(projectsRoot, { recursive: true });
+      await fsPromises.writeFile(
+        settingsFilePath,
+        JSON.stringify({
+          projects: [{ id: oldProjectId, path: projectPath, addedAt: 1, lastOpenedAt: 1 }],
+          activeProjectId: oldProjectId,
+        }, null, 2),
+        'utf8',
+      );
+      await fsPromises.writeFile(
+        path.join(projectsRoot, `${oldProjectId}.json`),
+        JSON.stringify({ 'setup-worktree': ['bun install'] }, null, 2),
+        'utf8',
+      );
+
+      const settings = await runtime.readSettingsFromDiskMigrated();
+
+      expect(settings.projects[0].id).toBe(newProjectId);
+      const migratedConfig = JSON.parse(await fsPromises.readFile(boundedPath, 'utf8'));
+      expect(migratedConfig['setup-worktree']).toEqual(['bun install']);
+      await expect(fsPromises.readFile(path.join(projectsRoot, `${oldProjectId}.json`), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+
+      // A second pass sees the bounded file beside the settings; it is the
+      // project's own file, not a stray from the random-id era.
+      await runtime.readSettingsFromDiskMigrated();
+      expect(JSON.parse(await fsPromises.readFile(boundedPath, 'utf8'))['setup-worktree']).toEqual(['bun install']);
+      expect(warn.mock.calls.some((call) => String(call[0]).includes('orphan'))).toBe(false);
+    } finally {
+      warn.mockRestore();
+      await cleanup();
+    }
+  });
+
   it.skipIf(process.platform !== 'win32')('falls back when Windows blocks atomic settings replacement', async () => {
     const tempRoot = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'oc-settings-runtime-'));
     const settingsFilePath = path.join(tempRoot, 'settings.json');
@@ -181,6 +370,102 @@ describe('settings runtime', () => {
       await expect(fsPromises.readFile(settingsFilePath, 'utf8')).resolves.toBe(JSON.stringify({ theme: 'dark' }, null, 2));
     } finally {
       await fsPromises.rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('moves project storage into the bounded folder when the canonical id is too long for a folder name', async () => {
+    const { runtime, settingsFilePath, tempRoot, cleanup } = await createRuntime();
+    try {
+      const projectPath = path.join(tempRoot, `${'segment-'.repeat(18)}`, 'demo-repo');
+      const oldProjectId = 'legacy-project-id';
+      const newProjectId = createProjectIdFromPath(projectPath);
+      const stem = projectConfigFileStemOf(newProjectId);
+      expect(newProjectId.length).toBeGreaterThan(240);
+      expect(stem).not.toBe(newProjectId);
+      const projectsRoot = path.join(path.dirname(settingsFilePath), 'projects');
+      const oldStorageDir = path.join(projectsRoot, oldProjectId);
+      const newStorageDir = path.join(projectsRoot, stem);
+
+      await fsPromises.mkdir(projectPath, { recursive: true });
+      await fsPromises.mkdir(path.join(oldStorageDir, 'plans'), { recursive: true });
+      await fsPromises.writeFile(path.join(oldStorageDir, 'context.json'), JSON.stringify({ version: 2, notes: [], todos: [{ id: 't1', text: 'keep', completed: false, createdAt: 1 }], plans: [] }), 'utf8');
+      await fsPromises.writeFile(path.join(oldStorageDir, 'plans', 'inside.md'), '# Inside\n', 'utf8');
+      await fsPromises.writeFile(path.join(oldStorageDir, 'memory.json'), JSON.stringify({ version: 1, entries: [] }), 'utf8');
+      await fsPromises.writeFile(
+        settingsFilePath,
+        JSON.stringify({
+          projects: [{ id: oldProjectId, path: projectPath, addedAt: 1, lastOpenedAt: 1 }],
+          activeProjectId: oldProjectId,
+        }, null, 2),
+        'utf8',
+      );
+      await fsPromises.writeFile(
+        path.join(projectsRoot, `${oldProjectId}.json`),
+        JSON.stringify({ projectPlanFiles: [{ id: 'inside', path: path.join(oldStorageDir, 'plans', 'inside.md') }] }, null, 2),
+        'utf8',
+      );
+
+      const settings = await runtime.readSettingsFromDiskMigrated();
+
+      expect(settings.projects.map((project) => project.id)).toEqual([newProjectId]);
+      const migratedConfig = JSON.parse(await fsPromises.readFile(path.join(projectsRoot, `${stem}.json`), 'utf8'));
+      expect(migratedConfig.projectPlanFiles).toEqual([{ id: 'inside', path: path.join(newStorageDir, 'plans', 'inside.md') }]);
+      expect(JSON.parse(await fsPromises.readFile(path.join(newStorageDir, 'context.json'), 'utf8')).todos).toHaveLength(1);
+      await fsPromises.access(path.join(newStorageDir, 'plans', 'inside.md'));
+      await fsPromises.access(path.join(newStorageDir, 'memory.json'));
+      expect((await fsPromises.readdir(projectsRoot)).sort()).toEqual([stem, `${stem}.json`]);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('moves a folder an older build created under a raw id that still fit a folder name into the bounded folder', async () => {
+    const { runtime, settingsFilePath, tempRoot, cleanup } = await createRuntime();
+    try {
+      // Long enough for the bounded name, short enough that an older build
+      // could still have created `<id>/` on this filesystem. The temp root
+      // differs per OS (a few characters on Linux runners, dozens on macOS),
+      // so pad to a fixed path length instead of a fixed segment.
+      const projectPathLength = 170;
+      const segment = 'x'.repeat(Math.max(1, projectPathLength - path.join(tempRoot, 'demo-repo').length - 1));
+      const projectPath = path.join(tempRoot, segment, 'demo-repo');
+      const projectId = createProjectIdFromPath(projectPath);
+      const stem = projectConfigFileStemOf(projectId);
+      expect(projectId.length).toBeGreaterThan(200);
+      expect(projectId.length).toBeLessThanOrEqual(255);
+      expect(stem).not.toBe(projectId);
+      const projectsRoot = path.join(path.dirname(settingsFilePath), 'projects');
+      const rawStorageDir = path.join(projectsRoot, projectId);
+      const boundedStorageDir = path.join(projectsRoot, stem);
+
+      await fsPromises.mkdir(projectPath, { recursive: true });
+      await fsPromises.mkdir(path.join(rawStorageDir, 'plans'), { recursive: true });
+      await fsPromises.writeFile(path.join(rawStorageDir, 'context.json'), JSON.stringify({ version: 2, notes: [{ id: 'n1', body: 'old note', createdAt: 1, updatedAt: 1 }], todos: [], plans: [] }), 'utf8');
+      await fsPromises.writeFile(path.join(rawStorageDir, 'plans', 'old.md'), '# Old\n', 'utf8');
+      await fsPromises.writeFile(path.join(rawStorageDir, 'memory.json'), JSON.stringify({ version: 1, entries: [{ id: 'm1', title: 'Old memory', body: 'x', type: 'fact', createdAt: 1, updatedAt: 1 }] }), 'utf8');
+      // The bounded folder already holds newer context: both sides survive.
+      await fsPromises.mkdir(boundedStorageDir, { recursive: true });
+      await fsPromises.writeFile(path.join(boundedStorageDir, 'context.json'), JSON.stringify({ version: 2, notes: [{ id: 'n2', body: 'new note', createdAt: 2, updatedAt: 2 }], todos: [], plans: [] }), 'utf8');
+      await fsPromises.writeFile(
+        settingsFilePath,
+        JSON.stringify({ projects: [{ id: projectId, path: projectPath, addedAt: 1, lastOpenedAt: 1 }], activeProjectId: projectId }, null, 2),
+        'utf8',
+      );
+
+      const settings = await runtime.readSettingsFromDiskMigrated();
+
+      expect(settings.projects.map((project) => project.id)).toEqual([projectId]);
+      const context = JSON.parse(await fsPromises.readFile(path.join(boundedStorageDir, 'context.json'), 'utf8'));
+      expect(context.notes.map((note) => note.id).sort()).toEqual(['n1', 'n2']);
+      await fsPromises.access(path.join(boundedStorageDir, 'plans', 'old.md'));
+      expect(JSON.parse(await fsPromises.readFile(path.join(boundedStorageDir, 'memory.json'), 'utf8')).entries).toHaveLength(1);
+      await expect(fsPromises.access(rawStorageDir)).rejects.toMatchObject({ code: 'ENOENT' });
+
+      // A second startup finds nothing left to move.
+      await runtime.readSettingsFromDiskMigrated();
+      expect(JSON.parse(await fsPromises.readFile(path.join(boundedStorageDir, 'context.json'), 'utf8')).notes).toHaveLength(2);
+    } finally {
+      await cleanup();
     }
   });
 

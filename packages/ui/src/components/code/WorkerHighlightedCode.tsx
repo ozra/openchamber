@@ -53,7 +53,7 @@ const applyPreStyles = (host: HTMLElement, wrap: boolean, codeStyle?: React.CSSP
 
 const plainHtml = (code: string): string => `<pre><code>${escapeHtml(code)}</code></pre>`;
 
-export interface WorkerHighlightedCodeProps {
+interface WorkerHighlightedCodeProps {
   code: string;
   language: string;
   className?: string;
@@ -103,7 +103,7 @@ export const WorkerHighlightedCode: React.FC<WorkerHighlightedCodeProps> = ({
   return (
     <div
       ref={hostRef}
-      className={cn('typography-code', className)}
+      className={cn('oc-surface-code bg-[var(--syntax-background)] typography-code', className)}
       style={{ ...(syntaxVars as React.CSSProperties), ...style }}
     />
   );

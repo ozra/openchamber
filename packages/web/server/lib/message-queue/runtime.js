@@ -13,6 +13,11 @@
 
 import fs from 'fs';
 import path from 'path';
+import { assertPromptResponse } from '../opencode/prompt-response.js';
+import { unwrapOpenCodeResponse } from '../opencode/response-envelope.js';
+import { createSessionActivityProbe } from '../opencode/session-activity.js';
+import { attachmentHint } from '../routing/runtime.js';
+import { buildGoalIntroText, createSessionGoal } from '../session-goal/create.js';
 
 const QUEUE_FILE_NAME = 'message-queue.json';
 const QUEUE_FILE_VERSION = 1;
@@ -27,6 +32,9 @@ const DISPATCH_QUIET_MS = 500;
 // After a user abort the UI held the queue for two seconds so the stop is not
 // immediately followed by the next prompt; the server keeps that window.
 const ABORT_HOLD_MS = 2_000;
+// While a background subagent keeps the turn open, how often the head is
+// rechecked in case the parent's rerun idle event is missed.
+const SUBAGENT_RECHECK_MS = 5_000;
 const RETRY_BASE_DELAY_MS = 2_000;
 const RETRY_MAX_DELAY_MS = 60_000;
 // A hold is asserted by a UI-driven process (auto-review) that dies with the
@@ -71,6 +79,20 @@ const parseSendConfig = (value) => {
   const variant = asNonEmptyString(raw.variant);
   if (variant) sendConfig.variant = variant;
   return sendConfig;
+};
+
+// "Run as goal" captured with the message: `objective` only when the arming
+// flow supplied its own (the plan flow), otherwise the delivered text is it.
+const parseGoal = (value) => {
+  if (value === undefined) return null;
+  const raw = asRecord(value);
+  if (!raw) throw new TypeError('invalid goal');
+  const tokenBudget = raw.tokenBudget ?? null;
+  if (tokenBudget !== null && !(Number.isInteger(tokenBudget) && tokenBudget > 0)) throw new TypeError('invalid goal tokenBudget');
+  const goal = { tokenBudget };
+  const objective = asNonEmptyString(raw.objective);
+  if (objective) goal.objective = objective;
+  return goal;
 };
 
 const parseAttachment = (value) => {
@@ -127,13 +149,27 @@ export const parseQueuedItemInput = (value) => {
     throw new TypeError('item needs text, attachments, or context');
   }
   const sendConfig = parseSendConfig(raw.sendConfig);
-  if (!sendConfig) throw new TypeError('item sendConfig with providerID and modelID is required');
+  const provenance = asRecord(raw.scheduledTask);
+  const projectId = asNonEmptyString(provenance?.projectId);
+  const taskId = asNonEmptyString(provenance?.taskId);
+  if (provenance && (!projectId || !taskId)) throw new TypeError('invalid scheduledTask provenance');
+  if (!sendConfig && !provenance) throw new TypeError('item sendConfig with providerID and modelID is required');
+  const goal = parseGoal(raw.goal);
+  if (goal && !text.trim()) throw new TypeError('a goal needs message text');
   const item = { content, text };
   const agentMention = asNonEmptyString(raw.agentMention);
   if (agentMention) item.agentMention = agentMention;
   item.attachments = attachments;
   item.context = context;
-  item.sendConfig = sendConfig;
+  const contextPreview = asNonEmptyString(raw.contextPreview).slice(0, 103);
+  if (contextPreview) item.contextPreview = contextPreview;
+  item.sendConfig = sendConfig ?? {};
+  if (goal) item.goal = goal;
+  if (provenance) {
+    item.scheduledTask = { projectId, taskId };
+    const agent = asNonEmptyString(raw.sendConfig?.agent);
+    if (agent) item.sendConfig.agent = agent;
+  }
   return item;
 };
 
@@ -157,7 +193,20 @@ const toPublicItem = (item) => {
   const publicItem = { id: item.id, createdAt: item.createdAt, content: item.content, text: item.text };
   if (item.agentMention) publicItem.agentMention = item.agentMention;
   publicItem.attachments = item.attachments.map(toPublicAttachment);
+  // Older persisted items have no UI summary. Prefer their attached comment
+  // before falling back to the model-facing context text.
+  const contextPreview = item.contextPreview || item.context
+    .filter((part) => part.kind !== 'instruction')
+    .map((part) => asNonEmptyString(asRecord(part.metadata?.openchamberContext)?.text) || part.text.trim())
+    .find(Boolean);
+  if (contextPreview) {
+    const firstLine = contextPreview.split('\n', 1)[0];
+    publicItem.contextPreview = firstLine.slice(0, 100)
+      + (contextPreview.length > firstLine.length || firstLine.length > 100 ? '...' : '');
+  }
   publicItem.sendConfig = { ...item.sendConfig };
+  if (item.goal) publicItem.goal = { ...item.goal };
+  if (item.scheduledTask) publicItem.scheduledTask = { ...item.scheduledTask };
   return publicItem;
 };
 
@@ -180,9 +229,20 @@ const extractAssistantMessageUpdate = (payload) => {
   if (!sessionId) return null;
   return {
     sessionId,
-    aborted: asRecord(info.error)?.name === 'MessageAbortedError',
     completed: asCount(asRecord(info.time)?.completed) !== null,
   };
+};
+
+/**
+ * A user abort no longer arrives as an assistant message carrying
+ * `MessageAbortedError`: v2 reports `session.execution.interrupted`, which the
+ * translator turns into `session.idle` with `aborted: true`.
+ */
+const extractAbortedSessionId = (payload) => {
+  if (payload.type !== 'session.idle') return null;
+  const properties = asRecord(payload.properties) ?? {};
+  if (properties.aborted !== true) return null;
+  return asNonEmptyString(properties.sessionID);
 };
 
 const extractDeletedSessionId = (payload) => {
@@ -198,6 +258,14 @@ export function createMessageQueueRuntime({
   sessionKnowledgeRuntime = null,
   broadcastGlobalUiEvent,
   onPromptSent,
+  beforeScheduledTaskSend,
+  validateScheduledTaskTarget,
+  onScheduledTaskResult,
+  // Resolves the `openchamber/auto` sentinel into a real model and agent right
+  // before the send; absent means the queue never sees the sentinel.
+  resolveAutoSelection = null,
+  // Saves the goal record of a message queued as a goal (the session metadata store).
+  persistSessionGoal = null,
   dataDir,
   fetchImpl = fetch,
   now = Date.now,
@@ -213,6 +281,13 @@ export function createMessageQueueRuntime({
   let loadPromise = null;
   let writePromise = Promise.resolve();
   let stopped = false;
+
+  // An unfinished assistant message older than this marker is a run that died
+  // with the previous server, not a streaming turn: no completion event will
+  // ever arrive for it, so treating it as live strands restored queue items
+  // forever. A run that outlived the restart (external OpenCode) is still
+  // caught by the live status check, which runs first.
+  const runtimeStartedAt = now();
 
   /** In-memory only — a restart has no in-flight sends. */
   const sending = new Map(); // sessionId → itemId
@@ -291,7 +366,8 @@ export function createMessageQueueRuntime({
       .then(async () => {
         await fs.promises.mkdir(dataDir, { recursive: true });
         const tmpPath = `${filePath}.${process.pid}.tmp`;
-        await fs.promises.writeFile(tmpPath, payload, 'utf8');
+        // Queued prompts are conversation content: readable by the owner only.
+        await fs.promises.writeFile(tmpPath, payload, { encoding: 'utf8', mode: 0o600 });
         await fs.promises.rename(tmpPath, filePath);
       })
       .catch((error) => {
@@ -332,7 +408,16 @@ export function createMessageQueueRuntime({
     return { revision, session: sessionSnapshot(sessionId) };
   };
 
-  const setQueueItems = (sessionId, directory, items) => {
+  const reportScheduledResult = (item, status, error) => {
+    if (!item.scheduledTask) return;
+    Promise.resolve().then(() => onScheduledTaskResult?.(item.scheduledTask, status, error))
+      .catch((failure) => console.warn('[message-queue] scheduled task state write failed:', failure?.message ?? failure));
+  };
+
+  const setQueueItems = (sessionId, directory, items, status = 'cancelled', error) => {
+    for (const item of queues.get(sessionId)?.items ?? []) {
+      if (item.scheduledTask && !items.some((entry) => entry.id === item.id)) reportScheduledResult(item, status, error);
+    }
     directories.set(sessionId, directory);
     if (items.length === 0) {
       queues.delete(sessionId);
@@ -359,28 +444,53 @@ export function createMessageQueueRuntime({
       const detail = await response.text().catch(() => '');
       throw httpError(`OpenCode ${method} ${fetchPath} failed with ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`, response.status);
     }
-    return response.json().catch(() => null);
+    if (method === 'POST') {
+      await assertPromptResponse(response, 'OpenCode dispatch');
+    }
+    return unwrapOpenCodeResponse(await response.json().catch(() => null));
   };
 
   /**
    * Live idleness, or null when it could not be established. Unknown is never
    * idle: a fetch failure re-arms instead of sending into a running turn.
    */
-  const isSessionIdle = async (sessionId, directory) => {
-    const statuses = asRecord(await openCodeFetch('/session/status', { directory }).catch(() => null));
+  const activityProbe = createSessionActivityProbe({ buildOpenCodeUrl, getOpenCodeAuthHeaders, timeoutMs: FETCH_TIMEOUT_MS, fetchImpl });
+
+  /** True while a subagent of the session runs; null when it could not be checked. */
+  const hasWorkingSubagents = async (sessionId) => {
+    const statuses = await activityProbe.fetchActiveSessionStatuses();
     if (!statuses) return null;
-    const type = asRecord(statuses[sessionId])?.type;
-    if (type === 'busy' || type === 'retry') return false;
-    // The status map lists only busy sessions, so a missed busy event leaves
-    // no entry while a turn still streams. The trailing unfinished assistant
-    // message is the live evidence of that turn (mirrors the UI gate).
-    const messages = asList(await openCodeFetch(`/session/${encodeURIComponent(sessionId)}/message`, {
+    return activityProbe.hasWorkingDescendants(sessionId, statuses);
+  };
+
+  const isSessionIdle = async (sessionId, directory) => {
+    // `/api/session/active` is global and lists only the sessions that are
+    // running right now, so an absent entry means idle.
+    // The route answers `{ data: { [id]: { type: 'running' } } }`; the shared
+    // unwrap hands over the map, and an envelope is still accepted.
+    const body = asRecord(await openCodeFetch('/api/session/active').catch(() => null));
+    const statuses = asRecord(body && 'data' in body ? body.data : body);
+    if (!statuses) return null;
+    if (asRecord(statuses[sessionId])) return false;
+    // A missed event leaves no entry while a turn still streams. The trailing
+    // unfinished assistant message is the live evidence of that turn (mirrors
+    // the UI gate). v2 lists messages newest first.
+    const page = await openCodeFetch(`/api/session/${encodeURIComponent(sessionId)}/message`, {
       directory,
       query: { limit: String(MESSAGE_TAIL_LIMIT) },
-    }).catch(() => null));
+    }).catch(() => null);
+    const messages = asList(asRecord(page)?.data);
     if (!messages) return null;
-    const last = asRecord(asRecord(messages[messages.length - 1])?.info);
-    if (last?.role === 'assistant' && asCount(asRecord(last.time)?.completed) === null) return false;
+    const last = asRecord(messages[0]);
+    const lastTime = asRecord(last?.time);
+    if (last?.type === 'assistant' && asCount(lastTime?.completed) === null) {
+      const created = asCount(lastTime?.created);
+      if (created === null || created >= runtimeStartedAt) return false;
+      // Unfinished tail from before this runtime started: its run died with
+      // the previous server, so it must not block delivery. (A missing
+      // created timestamp stays conservative and blocks, as before.)
+      console.log(`[message-queue] ignoring pre-boot unfinished tail for ${sessionId}`);
+    }
     return true;
   };
 
@@ -389,111 +499,139 @@ export function createMessageQueueRuntime({
     const [head, ...tail] = text.split(' ');
     const name = head.slice(1);
     if (!name) return null;
-    const commands = asList(await openCodeFetch('/command', { directory })) ?? [];
+    const commands = asList(await openCodeFetch('/api/command', { directory })) ?? [];
     const match = commands.map(asRecord).find((command) => command?.name === name);
     if (!match) return null;
     return {
       name,
       arguments: tail.join(' '),
-      isSkill: match.source === 'skill',
-      template: asNonEmptyString(match.template),
     };
   };
 
-  /**
-   * The prompt a slash command stands for, expanded the way OpenCode expands
-   * it: `$ARGUMENTS` takes the whole argument string, `$1..$N` take quoted or
-   * bare words with the last position absorbing the rest, and a template with
-   * no placeholder gets the arguments appended. Twin of the UI's
-   * `expandSlashCommandGoalObjective` in `packages/ui/src/sync/session-ui-store.ts`.
-   */
-  const expandCommandTemplate = (template, argumentsText) => {
-    if (template.includes('$ARGUMENTS')) return template.replaceAll('$ARGUMENTS', argumentsText);
-    const positions = [...template.matchAll(/\$(\d+)/g)].map((match) => Number(match[1]));
-    if (positions.length > 0) {
-      const parsed = [...argumentsText.matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)]
-        .map((match) => match[1] ?? match[2] ?? match[3] ?? '');
-      const last = Math.max(...positions);
-      return template.replace(/\$(\d+)/g, (_match, value) => {
-        const position = Number(value);
-        return position === last ? parsed.slice(position - 1).join(' ') : (parsed[position - 1] ?? '');
-      });
-    }
-    return argumentsText ? `${template}\n\n${argumentsText}` : template;
-  };
-
-  const toFilePart = (attachment) => ({
-    type: 'file',
-    mime: attachment.mimeType,
-    filename: attachment.filename,
-    url: attachment.dataUrl,
+  // v2 takes prompt attachments as URIs; a data URL is one.
+  const toPromptFile = (attachment) => ({
+    uri: attachment.dataUrl,
+    ...(attachment.filename ? { name: attachment.filename } : {}),
   });
 
-  // Captured context is delivered the way the composer delivers it: one
-  // synthetic text part per entry, an attached item's metadata riding along
-  // and its reading instructions (a linked PR) going first.
-  const toContextParts = (part) => {
-    const synthetic = { type: 'text', text: part.text, synthetic: true };
-    if (part.kind !== 'context') return [synthetic];
-    synthetic.metadata = part.metadata;
+  /**
+   * Captured context travels as synthetic messages in v2 — the composer's
+   * inline `synthetic: true` text parts are gone. One message per entry, an
+   * attached item's metadata riding along, and its reading instructions (a
+   * linked PR) going first.
+   */
+  const toContextMessages = (part) => {
+    const body = { text: part.text, resume: false };
+    if (part.kind !== 'context') return [body];
+    const withMetadata = part.metadata ? { ...body, metadata: part.metadata } : body;
     return part.instructions
-      ? [{ type: 'text', text: part.instructions, synthetic: true }, synthetic]
-      : [synthetic];
+      ? [{ text: part.instructions, resume: false }, withMetadata]
+      : [withMetadata];
   };
 
   const sendItem = async (sessionId, directory, item) => {
-    const { providerID, modelID, agent, variant } = item.sendConfig;
-    const fileParts = item.attachments.map(toFilePart);
-    const contextParts = item.context.flatMap(toContextParts);
-    // OpenCode's command route takes file parts only, so a command queued
-    // with captured context cannot go through it. Same rule as the composer:
-    // without context the command route keeps its semantics; with context the
-    // prompt route carries the expanded template (or the skill invocation as an
-    // explicit instruction) together with the context.
-    const command = await resolveSlashCommand(item.text, directory);
-    if (command && contextParts.length === 0) {
-      const body = { command: command.name, arguments: command.arguments, model: `${providerID}/${modelID}` };
-      if (agent) body.agent = agent;
-      if (variant) body.variant = variant;
-      if (fileParts.length > 0) body.parts = fileParts;
-      await openCodeFetch(`/session/${encodeURIComponent(sessionId)}/command`, { directory, method: 'POST', body });
-      return;
-    }
-    let text = item.text;
-    const commandParts = [];
-    if (command?.isSkill) {
-      commandParts.push({
-        type: 'text',
-        text: `The user explicitly invoked the ${command.name} skill. Use the corresponding skill tool to handle this request.`,
-        synthetic: true,
-      });
-    } else if (command?.template) {
-      text = expandCommandTemplate(command.template, command.arguments);
+    const { providerID, modelID, variant } = item.sendConfig;
+    let agent = item.sendConfig.agent;
+    let model = { id: modelID, providerID, ...(variant ? { variant } : {}) };
+    const promptFiles = item.attachments.map(toPromptFile);
+    const contextMessages = item.context.flatMap(toContextMessages);
+
+    // Jev routing, when the queued send named the Auto sentinel. A failure
+    // inside resolves to the fallback model; only a missing fallback throws.
+    const routed = providerID && modelID ? await resolveAutoSelection?.({
+      sessionId,
+      directory,
+      model,
+      agent,
+      requestText: `${item.text}${attachmentHint({ files: promptFiles })}`.trim(),
+    }) : null;
+    if (routed) {
+      model = routed.model;
+      agent = routed.agent ?? agent;
     }
 
-    // Standing project context rides the prompt exactly as a UI send would
-    // attach it; a failed lookup sends without it rather than not at all.
-    const knowledge = sessionKnowledgeRuntime
-      ? await sessionKnowledgeRuntime.resolvePendingForSession(sessionId, directory)
-        .catch(() => ({ text: '', signature: '' }))
-      : { text: '', signature: '' };
-    // Same order as a UI send: the user's text and files, the context queued
-    // with them, then the standing context, then the mentioned agent.
-    const parts = [];
-    if (text.trim()) parts.push({ type: 'text', text });
-    parts.push(...fileParts);
-    parts.push(...contextParts);
-    parts.push(...commandParts);
-    if (knowledge.text) parts.push({ type: 'text', text: knowledge.text, synthetic: true });
-    if (item.agentMention) parts.push({ type: 'agent', name: item.agentMention });
-    const body = { model: { providerID, modelID } };
-    if (agent) body.agent = agent;
-    if (variant) body.variant = variant;
-    body.parts = parts;
-    await openCodeFetch(`/session/${encodeURIComponent(sessionId)}/prompt_async`, { directory, method: 'POST', body });
-    if (knowledge.text && sessionKnowledgeRuntime) {
-      // After the prompt is accepted, so a rejected dispatch carries it again.
-      await sessionKnowledgeRuntime.recordDelivered(sessionId, directory, knowledge.signature).catch(() => undefined);
+    // v2 selects model and agent on the session, not per prompt: the choice is
+    // switched once and then persists.
+    if (!item.scheduledTask || (providerID && modelID)) await openCodeFetch(`/api/session/${encodeURIComponent(sessionId)}/model`, {
+      directory,
+      method: 'POST',
+      body: { model },
+    });
+    if (agent) {
+      await openCodeFetch(`/api/session/${encodeURIComponent(sessionId)}/agent`, {
+        directory,
+        method: 'POST',
+        body: { agent },
+      });
+    }
+
+    // Resolved before anything is admitted: a failed command lookup fails the
+    // whole send, so a retry does not admit the context twice.
+    const command = await resolveSlashCommand(item.text, directory);
+
+    // Standing project context is written into the session first, exactly as
+    // a UI send does it; a failed write sends without it rather than not at all.
+    if (sessionKnowledgeRuntime) await sessionKnowledgeRuntime.sync(sessionId, directory);
+
+    // A message queued as a goal starts it now, as a direct send would. The
+    // goal is saved before anything is admitted, so a failed save leaves
+    // nothing in the session for the retry to duplicate.
+    if (item.goal) {
+      await createSessionGoal({
+        persistSessionGoal,
+        sessionID: sessionId,
+        directory,
+        objective: item.goal.objective || item.text,
+        tokenBudget: item.goal.tokenBudget,
+        providerID: model.providerID,
+        modelID: model.id,
+        onWarning: (message, error) => console.warn(`[message-queue] ${message}:`, error?.message || error),
+      });
+    }
+
+    // Same order as a UI send: everything attached to the message is admitted
+    // before the message itself, so the model reads it as background. This
+    // holds for a command too: its route takes file attachments only, and
+    // sending "/name args" as a prompt instead would skip the template
+    // OpenCode 2.x expands only on the command route.
+    for (const synthetic of contextMessages) {
+      await openCodeFetch(`/api/session/${encodeURIComponent(sessionId)}/synthetic`, {
+        directory,
+        method: 'POST',
+        body: synthetic,
+      });
+    }
+
+    // The goal briefing goes last, right before the message the goal is about.
+    if (item.goal) {
+      await openCodeFetch(`/api/session/${encodeURIComponent(sessionId)}/synthetic`, {
+        directory,
+        method: 'POST',
+        body: { text: buildGoalIntroText(item.goal.tokenBudget), resume: false },
+      });
+    }
+
+    if (command) {
+      await openCodeFetch(`/api/session/${encodeURIComponent(sessionId)}/command`, {
+        directory,
+        method: 'POST',
+        body: {
+          // OpenCode 2.0.8 renamed the command body field `command` to `name`.
+          name: command.name,
+          text: command.arguments,
+          ...(promptFiles.length > 0 ? { files: promptFiles } : {}),
+        },
+      });
+    } else {
+      await openCodeFetch(`/api/session/${encodeURIComponent(sessionId)}/prompt`, {
+        directory,
+        method: 'POST',
+        body: {
+          text: item.text,
+          ...(promptFiles.length > 0 ? { files: promptFiles } : {}),
+          ...(item.agentMention ? { agents: [{ name: item.agentMention }] } : {}),
+        },
+      });
     }
   };
 
@@ -549,11 +687,34 @@ export function createMessageQueueRuntime({
 
     const idle = await isSessionIdle(sessionId, queue.directory);
     if (idle === null) {
+      if (head.scheduledTask && validateScheduledTaskTarget) {
+        try {
+          await validateScheduledTaskTarget(head.scheduledTask.projectId, sessionId);
+        } catch (error) {
+          if (error?.statusCode === 404 || error?.statusCode === 409) {
+            const after = queues.get(sessionId);
+            if (after) setQueueItems(sessionId, after.directory, after.items.filter((entry) => entry.id !== head.id), 'failed', error.message);
+            commit(sessionId);
+            armDispatch(sessionId);
+            return;
+          }
+        }
+      }
       armDispatch(sessionId, retryDelayMs(1));
       return;
     }
     // Busy: the next idle status event re-arms the loop.
     if (!idle) return;
+
+    // A queued message waits for the whole turn. A parent idles while a
+    // background subagent works and runs again when OpenCode hands the
+    // result back, so the turn is only over once no subagent runs. That rerun
+    // re-arms through its idle event; the recheck covers a missed one.
+    const subagentsWorking = await hasWorkingSubagents(sessionId);
+    if (subagentsWorking !== false) {
+      armDispatch(sessionId, subagentsWorking === null ? retryDelayMs(1) : SUBAGENT_RECHECK_MS);
+      return;
+    }
 
     // Re-read after the awaits — the user may have edited the queue meanwhile.
     const current = queues.get(sessionId);
@@ -563,9 +724,23 @@ export function createMessageQueueRuntime({
     sending.set(sessionId, item.id);
     broadcast(sessionId);
     try {
+      if (item.scheduledTask) {
+        try {
+          await beforeScheduledTaskSend?.(sessionId, current.directory, item);
+        } catch (error) {
+          if (error?.statusCode !== 404 && error?.statusCode !== 409) throw error;
+          sending.delete(sessionId);
+          const after = queues.get(sessionId);
+          if (after) setQueueItems(sessionId, after.directory, after.items.filter((entry) => entry.id !== item.id), 'failed', error.message);
+          failures.delete(sessionId);
+          commit(sessionId);
+          armDispatch(sessionId);
+          return;
+        }
+      }
       await sendItem(sessionId, current.directory, item);
       const after = queues.get(sessionId);
-      if (after) setQueueItems(sessionId, after.directory, after.items.filter((entry) => entry.id !== item.id));
+      if (after) setQueueItems(sessionId, after.directory, after.items.filter((entry) => entry.id !== item.id), 'sent');
       failures.delete(sessionId);
       sending.delete(sessionId);
       commit(sessionId);
@@ -605,6 +780,16 @@ export function createMessageQueueRuntime({
     if (!directory) throw new TypeError('directory is required');
     const parsed = parseQueuedItemInput(itemInput);
     await load();
+    if (parsed.scheduledTask) {
+      for (const queue of queues.values()) {
+        if (queue.items.some((entry) => entry.scheduledTask?.projectId === parsed.scheduledTask.projectId && entry.scheduledTask.taskId === parsed.scheduledTask.taskId)) {
+          throw httpError('task is already queued', 409);
+        }
+      }
+      if ((queues.get(sessionId)?.items.length ?? 0) >= MAX_ITEMS_PER_SESSION || (!queues.has(sessionId) && queues.size >= MAX_SESSIONS)) {
+        throw httpError('message queue is full', 409);
+      }
+    }
     const item = {
       id: `queued-${now()}-${Math.random().toString(36).slice(2, 9)}`,
       createdAt: now(),
@@ -612,7 +797,7 @@ export function createMessageQueueRuntime({
     };
     const existing = queues.get(sessionId);
     const items = [...(existing?.items ?? []), item].slice(-MAX_ITEMS_PER_SESSION);
-    queues.set(sessionId, { directory, items });
+    setQueueItems(sessionId, directory, items);
     directories.set(sessionId, directory);
     if (queues.size > MAX_SESSIONS) {
       const oldest = Array.from(queues.entries())
@@ -620,7 +805,7 @@ export function createMessageQueueRuntime({
         .sort((left, right) => (left[1].items[0]?.createdAt ?? 0) - (right[1].items[0]?.createdAt ?? 0))
         .slice(0, queues.size - MAX_SESSIONS);
       for (const [staleId] of oldest) {
-        queues.delete(staleId);
+        setQueueItems(staleId, directories.get(staleId), []);
         clearTimer(staleId);
         broadcast(staleId);
         directories.delete(staleId);
@@ -653,6 +838,7 @@ export function createMessageQueueRuntime({
     const queue = queues.get(sessionId);
     const item = queue?.items.find((entry) => entry.id === itemId);
     if (!queue || !item) throw httpError('queued message not found', 404);
+    if (item.scheduledTask) throw httpError('scheduled messages cannot be taken', 409);
     setQueueItems(sessionId, queue.directory, queue.items.filter((entry) => entry.id !== itemId));
     return { ...commit(sessionId), item };
   };
@@ -664,9 +850,9 @@ export function createMessageQueueRuntime({
     const queue = queues.get(sessionId);
     if (!queue) return { revision, session: sessionSnapshot(sessionId), items: [] };
     const sendingId = sending.get(sessionId) ?? null;
-    const items = queue.items.filter((item) => item.id !== sendingId);
+    const items = queue.items.filter((item) => item.id !== sendingId && !item.scheduledTask);
     if (items.length === 0) return { revision, session: sessionSnapshot(sessionId), items: [] };
-    setQueueItems(sessionId, queue.directory, queue.items.filter((item) => item.id === sendingId));
+    setQueueItems(sessionId, queue.directory, queue.items.filter((item) => item.id === sendingId || item.scheduledTask));
     return { ...commit(sessionId), items };
   };
 
@@ -722,7 +908,7 @@ export function createMessageQueueRuntime({
     const deletedSessionId = extractDeletedSessionId(payload);
     if (deletedSessionId) {
       if (!queues.has(deletedSessionId)) return;
-      queues.delete(deletedSessionId);
+      setQueueItems(deletedSessionId, directories.get(deletedSessionId), []);
       clearTimer(deletedSessionId);
       failures.delete(deletedSessionId);
       commit(deletedSessionId);
@@ -738,9 +924,14 @@ export function createMessageQueueRuntime({
       return;
     }
 
+    const abortedSessionId = extractAbortedSessionId(payload);
+    if (abortedSessionId) {
+      if (queues.has(abortedSessionId)) abortedAt.set(abortedSessionId, now());
+      return;
+    }
+
     const assistant = extractAssistantMessageUpdate(payload);
     if (assistant && queues.has(assistant.sessionId)) {
-      if (assistant.aborted) abortedAt.set(assistant.sessionId, now());
       // A completed reply without a following idle status (missed event)
       // must still drain the queue; the tick verifies idleness itself.
       if (assistant.completed && !timers.has(assistant.sessionId)) armDispatch(assistant.sessionId);
@@ -748,8 +939,8 @@ export function createMessageQueueRuntime({
   };
 
   const processEvent = (event) => {
-    const raw = asRecord(asRecord(event)?.payload);
-    processPayload(asRecord(raw?.payload) ?? raw);
+    // The hub translates v2 wire events into the server's vocabulary once.
+    for (const payload of event?.translated?.() ?? []) processPayload(payload);
   };
 
   const start = () => {
@@ -777,11 +968,23 @@ export function createMessageQueueRuntime({
     timers.clear();
   };
 
+  const cancelScheduledTask = async (projectId, taskId) => {
+    await load();
+    for (const [sessionId, queue] of queues) {
+      const items = queue.items.filter((item) => item.scheduledTask?.projectId !== projectId || item.scheduledTask.taskId !== taskId || sending.get(sessionId) === item.id);
+      if (items.length === queue.items.length) continue;
+      setQueueItems(sessionId, queue.directory, items);
+      commit(sessionId);
+      armDispatch(sessionId);
+    }
+  };
+
   return {
     load,
     snapshot,
     sessionSnapshot,
     enqueue,
+    cancelScheduledTask,
     remove,
     take,
     takeAll,
@@ -813,6 +1016,7 @@ export function registerMessageQueueRoutes(app, runtime) {
 
   app.post('/api/message-queue/sessions/:sessionId/items', async (req, res) => {
     try {
+      if (req.body?.item?.scheduledTask) throw new TypeError('scheduledTask is server-owned');
       res.json(await runtime.enqueue(req.params.sessionId, req.body?.directory, req.body?.item));
     } catch (error) {
       respondError(res, error, 'Failed to queue message');

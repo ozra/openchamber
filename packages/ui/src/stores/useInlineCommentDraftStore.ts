@@ -1,9 +1,11 @@
+import type { SourceControlProvider } from '@/lib/source-control/types';
 import { create } from 'zustand';
 import { z } from 'zod';
 import { devtools, persist } from 'zustand/middleware';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import { normalizePath } from '@/lib/pathNormalization';
 import { createDeferredSafeJSONStorage } from './utils/safeStorage';
+import { chatQuoteAnchorSchema, type ChatQuoteAnchor } from '@/lib/chatQuoteAnchor';
 
 export type InlineCommentSource = 'diff' | 'plan' | 'file' | 'preview-annotation' | 'terminal' | 'pr-comment' | 'pr-check' | 'chat-quote' | 'file-quote';
 
@@ -25,6 +27,10 @@ export interface InlineCommentDraft {
   text: string;
   /** Owning terminal session; set only for `source: 'terminal'`. */
   terminalId?: string;
+  /** Where the quote sits in its message; set only for `source: 'chat-quote'`. */
+  anchor?: ChatQuoteAnchor;
+  /** Whose change request it came from; set only for `pr-comment` and `pr-check`, absent means GitHub. */
+  provider?: SourceControlProvider;
   createdAt: number;
 }
 
@@ -183,6 +189,8 @@ const persistedDraftSchema = z.object({
   language: z.string(),
   text: z.string(),
   terminalId: z.string().optional(),
+  anchor: chatQuoteAnchorSchema.optional(),
+  provider: z.enum(['github', 'gitlab']).optional(),
   createdAt: z.number(),
 });
 

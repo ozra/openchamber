@@ -13,7 +13,6 @@ import {
 import type { QuotaTone } from '@/lib/quota';
 import { cn } from '@/lib/utils';
 import type { TimeFormatPreference } from '@/stores/useUIStore';
-import type { UsageWindow } from '@/types';
 import type { UsageProviderGroup } from './usageGroups';
 
 const toneToValueClass = (tone: QuotaTone): string => (
@@ -25,12 +24,11 @@ const toneToValueClass = (tone: QuotaTone): string => (
 );
 
 /**
- * One elevated card per provider, each holding a run of quota windows.
+ * One lightly tinted card per provider, each holding a run of quota windows.
  *
  * Built for narrow columns: labels truncate, values stay pinned right, and
- * nothing relies on horizontal room the container may not have. Used in the
- * mobile session-metadata popover, where mounting is gated by the popover
- * being open — the shared pace clock runs only while a card is actually shown.
+ * nothing relies on horizontal room the container may not have. Shared by the
+ * mobile session-metadata popover and the work-status panel.
  */
 export const UsageProviderCards: React.FC<{
   groups: UsageProviderGroup[];
@@ -44,7 +42,7 @@ export const UsageProviderCards: React.FC<{
   return (
     <div className={cn('space-y-1.5', className)}>
       {groups.map((group) => (
-        <div key={group.providerId} className="min-w-0 rounded-xl bg-[var(--surface-muted)] p-2.5">
+        <div key={group.providerId} className="min-w-0 rounded-xl bg-foreground/[0.03] p-2.5">
           <div className="flex min-w-0 items-center gap-2">
             <ProviderLogo providerId={group.providerId} className="size-4 shrink-0" />
             <span className="min-w-0 flex-1 truncate typography-ui-label font-medium text-foreground">
@@ -64,9 +62,7 @@ export const UsageProviderCards: React.FC<{
             <div className="mt-1.5 space-y-1">
               {group.rows.map((row) => {
                 const usedPercent = row.window.usedPercent;
-                // The delta only reads correctly next to the used percentage
-                // itself; value-label rows keep tone but no suffix.
-                // `computePaceDelta` establishes finitude of every field.
+                // Value-label rows keep their tone without a percentage-point suffix.
                 const paceDelta = displayMode === 'usage' && !row.window.valueLabel
                   ? computePaceDelta(row.window, now)
                   : null;

@@ -82,6 +82,13 @@ describe('model-facing text', () => {
         expect(formatContextText(contextPayloadFromDraft(draft({ source: 'pr-check', fileLabel: 'CI / build', code: 'boom', text: 'why?' }))))
             .toBe('Attached failed GitHub PR check (CI / build):\n```\nboom\n```\n\nwhy?');
     });
+
+    test('a GitLab merge request comment and pipeline job say so', () => {
+        expect(formatContextText(contextPayloadFromDraft(draft({ source: 'pr-comment', provider: 'gitlab', fileLabel: '!7 @octo', code: 'the comment', text: '' }))))
+            .toBe('Attached GitLab merge request comment (!7 @octo):\n\nthe comment');
+        expect(formatContextText(contextPayloadFromDraft(draft({ source: 'pr-check', provider: 'gitlab', fileLabel: '!7 · build', code: 'boom', text: '' }))))
+            .toBe('Attached failed GitLab merge request pipeline job (!7 · build):\n```\nboom\n```');
+    });
 });
 
 describe('round-trip through part metadata', () => {
@@ -99,6 +106,11 @@ describe('round-trip through part metadata', () => {
             contextPayloadFromDraft(draft({ source: 'pr-comment' })),
             contextPayloadFromDraft(draft({ source: 'pr-check' })),
             contextPayloadFromDraft(draft({ source: 'chat-quote', fileLabel: 'msg_1' })),
+            contextPayloadFromDraft(draft({
+                source: 'chat-quote',
+                fileLabel: 'msg_1',
+                anchor: { text: 'quoted', prefix: 'before ', suffix: ' after', start: 7 },
+            })),
             contextPayloadFromDraft(draft({ source: 'file-quote', startLine: 3, endLine: 5 })),
             contextPayloadFromDraft(draft({ source: 'file-quote', startLine: 0, endLine: 0 })),
         ];
@@ -107,17 +119,68 @@ describe('round-trip through part metadata', () => {
         }
     });
 
-    test('github references carry picker-built text and structured identity', () => {
-        const payload: ContextPartPayload = { kind: 'github-issue', number: 3, title: 'Bug', url: 'https://x/issues/3' };
+    test('repository references carry picker-built text and structured identity', () => {
+        const payload: ContextPartPayload = { kind: 'repository-issue', number: 3, title: 'Bug', url: 'https://x/issues/3' };
         const part = asPart(payload, 'GitHub issue context (JSON)\n{}');
         expect(part.text).toBe('GitHub issue context (JSON)\n{}');
         expect(readContextPart(part)).toEqual(payload);
+    });
+
+    test('normalizes legacy GitHub reference kinds at the read boundary', () => {
+        expect(readContextPart({
+            type: 'text',
+            metadata: { [CONTEXT_METADATA_KEY]: { kind: 'github-issue', number: 3, title: 'Bug', url: 'https://x/issues/3' } },
+        })).toEqual({ kind: 'repository-issue', number: 3, title: 'Bug', url: 'https://x/issues/3' });
+        expect(readContextPart({
+            type: 'text',
+            metadata: { [CONTEXT_METADATA_KEY]: { kind: 'github-pr', number: 4, title: 'Fix', url: 'https://x/pull/4' } },
+        })).toEqual({ kind: 'change-request', provider: 'github', number: 4, title: 'Fix', url: 'https://x/pull/4' });
     });
 
     test('linear references carry picker-built text and the identifier', () => {
         const payload: ContextPartPayload = { kind: 'linear-issue', identifier: 'ENG-12', title: 'Login', url: 'https://linear.app/x/issue/ENG-12' };
         const part = asPart(payload, 'Linear issue context (JSON)\n{}');
         expect(part.text).toBe('Linear issue context (JSON)\n{}');
+        expect(readContextPart(part)).toEqual(payload);
+    });
+
+    test('guest references carry picker-built text and no github number', () => {
+        const payload: ContextPartPayload = {
+            kind: 'guest-issue',
+            providerId: 'hello',
+            id: 'HELLO-1',
+            title: 'Sample ticket',
+            url: 'https://example.com/HELLO-1',
+        };
+        const part = asPart(payload, 'guest body');
+        expect(part.text).toBe('guest body');
+        expect(readContextPart(part)).toEqual(payload);
+    });
+
+    test('guest references keep opaque data in metadata, not in text', () => {
+        const payload: ContextPartPayload = {
+            kind: 'guest-issue',
+            providerId: 'hello',
+            id: 'HELLO-1',
+            title: 'Sample ticket',
+            url: 'https://example.com/HELLO-1',
+            data: { status: 'open', comments: [{ author: 'mara', text: 'hi' }] },
+        };
+        const part = asPart(payload, 'guest body');
+        expect(part.text).toBe('guest body');
+        expect(readContextPart(part)).toEqual(payload);
+    });
+
+    test('guest pull references carry picker-built text and no github number', () => {
+        const payload: ContextPartPayload = {
+            kind: 'guest-pr',
+            providerId: 'gitlab',
+            id: '!12',
+            title: 'Fix login',
+            url: 'https://gitlab.com/acme/app/-/merge_requests/12',
+        };
+        const part = asPart(payload, 'guest pr body');
+        expect(part.text).toBe('guest pr body');
         expect(readContextPart(part)).toEqual(payload);
     });
 

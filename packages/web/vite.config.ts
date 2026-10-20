@@ -87,7 +87,8 @@ export default defineConfig({
   ],
   resolve: {
     alias: [
-      { find: '@opencode-ai/sdk/v2', replacement: path.resolve(__dirname, '../../node_modules/@opencode-ai/sdk/dist/v2/client.js') },
+      { find: '@openchamber/sdk/schemas', replacement: path.resolve(__dirname, '../sdk/src/schemas.ts') },
+      { find: '@openchamber/sdk', replacement: path.resolve(__dirname, '../sdk/src/index.ts') },
       { find: '@openchamber/ui', replacement: path.resolve(__dirname, '../ui/src') },
       { find: '@web', replacement: path.resolve(__dirname, './src') },
       { find: '@', replacement: path.resolve(__dirname, '../ui/src') },
@@ -102,7 +103,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(packageJson.version),
   },
   optimizeDeps: {
-    include: ['@opencode-ai/sdk/v2'],
+    include: ['@opencode/client'],
   },
   server: {
     port: 5173,
@@ -148,6 +149,10 @@ export default defineConfig({
             return 'vendor-vite-runtime';
           }
           if (!id.includes('node_modules')) return undefined;
+          // A stylesheet stays with the chunk that imports it. Grouping KaTeX's
+          // eager stylesheet into `vendor-katex` made that chunk eager, and with
+          // it the 260KB KaTeX engine only the lazy markdown renderer uses.
+          if (id.endsWith('.css')) return undefined;
 
           // Resolve the real package from the LAST `node_modules/` segment.
           // bun's isolated install nests packages as
@@ -186,7 +191,7 @@ export default defineConfig({
           if (packageName === 'react' || packageName === 'react-dom') return 'vendor-react';
           if (packageName === 'zustand' || packageName === 'zustand/middleware') return 'vendor-zustand';
 
-          if (packageName === '@opencode-ai/sdk') return 'vendor-opencode-sdk';
+          if (packageName === '@opencode/client') return 'vendor-opencode-client';
           if (packageName.includes('remark') || packageName.includes('rehype') || packageName === 'react-markdown') return 'vendor-markdown';
           if (packageName === '@base-ui/react' || packageName.startsWith('@base-ui')) return 'vendor-base-ui';
 

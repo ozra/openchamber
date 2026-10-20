@@ -1,22 +1,25 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { clampPercent } from '@/lib/quota';
+import { clampPercent, resolveUsageTone } from '@/lib/quota';
 import type { QuotaTone } from '@/lib/quota';
 
 interface UsageProgressBarProps {
   percent: number | null;
   /** Resolved quota tone (PRD-020 paces eligible windows); already computed by
    * the caller so the bar can never disagree with the value beside it. */
-  tone: QuotaTone;
+  tone?: QuotaTone;
+  tonePercent?: number | null;
   className?: string;
 }
 
 export const UsageProgressBar: React.FC<UsageProgressBarProps> = ({
   percent,
-  tone,
+  tone: explicitTone,
+  tonePercent,
   className,
 }) => {
   const clamped = clampPercent(percent) ?? 0;
+  const tone = explicitTone ?? resolveUsageTone(tonePercent ?? percent);
 
   const fillStyle = tone === 'critical'
     ? { backgroundColor: 'var(--status-error)' }

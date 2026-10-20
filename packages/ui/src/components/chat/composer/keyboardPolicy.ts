@@ -9,10 +9,13 @@ export interface EnterKeyPolicyInput {
 }
 
 export const shouldSubmitEnter = (input: EnterKeyPolicyInput): boolean => {
-    const enterSendsByDefault = !input.isMobile && !input.isDesktopExpanded;
+    // Mobile and the expanded composer only ever send with Ctrl/Cmd held.
     const isCtrlEnter = input.ctrlKey || input.metaKey;
+    if (input.isMobile) return isCtrlEnter;
+    if (input.isDesktopExpanded) return isCtrlEnter;
+
     if (!input.enterToSendConfigured) {
-        return !input.shiftKey && (enterSendsByDefault || isCtrlEnter);
+        return !input.shiftKey && (isCtrlEnter || !input.isMobile);
     }
     // PRD-031 (fork): Shift+Enter is a newline whatever else is held. Upstream
     // makes it submit when "Enter sends" is off, which spends the one chord
