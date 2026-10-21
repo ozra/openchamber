@@ -1,12 +1,13 @@
 ---
-status: review
+status: done
 created: 2026-09-01
-related: ["OCH-002","OCH-011","OCH-018","OCH-019","OCH-022","OCH-023"]
+related: ["OCH-002","OCH-011","OCH-018","OCH-019","OCH-022","OCH-023","OCH-041","OCH-042","OCH-043","OCH-044","OCH-045"]
 kind: "feature"
 aliases: ["PRD-001"]
 depends_on: []
 complexity: medium
 estimated_effort: "3"
+ended: 2026-10-21 12:58
 ---
 
 # TimelineRail
@@ -226,63 +227,30 @@ Additive variant that replaces the upstream rail at its single mount point.
 
 ## Later iterations
 
-Kept from the earlier version of this ticket; each becomes its own ticket or
-iteration once v1 lands.
+Follow-up work is tracked separately and does not block this accepted MVP:
 
-- **Message-type toggles.** Tiny square/dot toggles at the top of the rail, one
-  per class (user input, agent output, tool/activity, system/control), all on
-  initially; user-only gives the old prompt-rail view. A disabled class has no
-  spans or hit targets, keeps its decoration state, and does not move the frame.
-  Temporary view state: survives responsive auto-hide, resets when the rail
-  closes or the conversation changes. Keyboard reachable, accessible name,
-  pressed state, tooltip, not color alone.
-- **Content/Time length mode.** A two-state control beside the toggles using the
-  shared sprite `Icon` (content-size or clock), translated state name and
-  tooltip, persisted across conversations. Time mode sizes non-user spans by
-  authoritative duration on a log scale with a five-minute cutoff, falls back to
-  content for missing or invalid timing, never infers duration from neighbors or
-  busy events, grows live spans at most once per second, and does no timer work
-  when hidden or in Content mode. User-originated spans stay content-sized,
-  anchored to the median of completed timed spans (midpoint when none) per
-  `custom-dev/DOCUMENTATION.md`, recalculated only when the history boundary
-  changes. Switching modes changes painted length only.
-- **OCH-023 question answers.** Answer subspans from parsed question-tool output
-  with user-input lane, color, sizing, filtering, preview, and navigation,
-  keeping the owning `partId` and question/answer index, no synthetic SDK user
-  message. The request stays tool-identified.
-- **OCH-022 decorations.** Consume `entryStates` per span; render `dimmed`,
-  `highlighted`, `selected`, `focused` for the narrow rail over the intrinsic
-  hue. The rail does not own the registry or take Find props.
-- **OCH-018 Find.** Find results preview at matching message or part spans
-  through OCH-022, without navigating Chat.
-- **OCH-019 placement.** Move the rail into the workspace stack as a stackable
-  view with user-ordered side and position and the shared width rules.
-- **OCH-002.** Range selection in the rail reflected in the trajectory ledger
-  and Chat.
-- **Fix: loaded history is evicted within seconds (UAT 2026-10-21).** Loading
-  earlier history from the rail's up-arrow is thrown away again about 3 s
-  later. Lead: `ChatContainer` trims history `HISTORY_TRIM_DELAY_MS` (3 s)
-  after the view is pinned at the end, and the up-arrow loads without moving
-  the view, so a reader at the end is still pinned. Wanted: history the user
-  expanded stays while they work with the timeline, and is trimmed again only
-  once they are back to prompting or have left the timeline alone for a while.
-- **Rail context menu (idea, 2026-10-21).** Right-clicking the rail opens a
-  menu with: a filter dialog choosing which span kinds stand out (the others
-  stay visible at 20% opacity, always painted under the chosen ones), and a
-  toggle for the hover lens, which is also in Settings. Supersedes the
-  top-of-rail toggles described under "Message-type toggles".
-- **Hover lens (idea, 2026-10-21).** While hovering, a window like the
-  viewport frame magnifies the spans under the pointer: stretched along the
-  rail so tight calls separate, and about 25% wider. A hunting scope, not a
-  sniper scope; maybe overkill.
-- **Conversation map on hover (idea, 2026-10-21).** While hovering, every
-  prompt and each turn's last reply (before the next prompt, or the end) shows
-  a one-line box out from its position, cropped to a fitting width so it
-  doesn't reach far from the rail; the hovered span's box stays on top and
-  shows in full. No titles: prompts in a brighter grey and sticking out about
-  20 px further, mirroring their lane; replies a slightly less bright grey;
-  all with a translucent feel. A rough map of the conversation that gets the
-  pointer 90% of the way to what you're looking for.
+- OCH-041, TimelineRail context menu and filtering. Replaces the earlier
+  top-of-rail message-type toggles proposal.
+- OCH-042, TimelineRail content and time length modes.
+- OCH-043, TimelineRail hover magnification lens.
+- OCH-044, TimelineRail conversation map on hover.
+- OCH-045, Keep explicitly loaded timeline history available. Known bug accepted
+  as an MVP limitation on 2026-10-21; the history-retention fix is deferred.
+
+Existing tickets retain ownership of their rail integrations:
+
+- OCH-023, User-originated question answers, owns answer subspans with user
+  lane, color, content sizing, filtering, preview, navigation, and stable owning
+  part/question/answer identity. Requests remain tool-identified; no synthetic SDK messages.
+- OCH-022, Conversation decorations, owns consuming entryStates for dimmed,
+  highlighted, selected, and focused spans over intrinsic hues. The rail does
+  not own the registry or take Find props.
+- OCH-018, Conversation Find view, owns matching message/part span previews
+  through the decoration registry without navigating Chat.
+- OCH-019, Stackable workspace views, owns user-ordered rail placement and
+  shared width rules.
+- OCH-002, Trajectory ledger view, owns rail range selection reflected in the
+  ledger and Chat.
 
 Dropped: approximate tokens-per-second in the title bar.
 
@@ -312,3 +280,11 @@ UAT round 1 found three issues, fixed: duplicate React key left the previous tra
 ### 2026-10-21 09:00 · oscar
 
 Pre-commit review fixed: wheel over the rail scrolls Chat; a pointer no longer focuses the rail; clicks in a folded turn unfold it (Thinking spans also open the reasoning block); reasoning spans follow Show reasoning traces; memoized spans, so hover re-renders two; StrictMode no longer leaves the rail empty; stale list positions cannot reorder spans; header offset 3rem; frame height is no longer reset by React; shortcut before the first layout; aria-current on the active turn.
+
+### 2026-10-21 12:58 · oscar
+
+User explicitly accepted the initial MVP and requested completion on 2026-10-21 ("do it and done it"). Extracted enhancements to OCH-041 through OCH-044 and the known history-eviction bug to OCH-045, accepted as a deferred MVP limitation. Existing integration tickets retain ownership. Prior UAT and fixes are recorded above. This ticket-only update makes no new runtime-validation claim; no additional optional checks were selected.
+
+### 2026-10-21 12:58 · oscar
+
+Set status=done; moved to done/.
