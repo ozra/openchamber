@@ -220,8 +220,10 @@ ways by sharing the header's old `useSessionUIStore.getContextUsage` getter:
    The header now reads through `useSessionMessagesSelector`, which subscribes.
 
 `contextUsage.ts` therefore computes the same quantity from messages the panel
-has already subscribed to for a known session and directory, and the panel
-subscribes to `currentProviderId` / `currentModelId` for the limits.
+has already subscribed to for a known session and directory. The shared
+`useContextWindowLimits` hook follows the session's pending picker choice and
+authoritative record. A remote record switch supersedes the older saved choice
+using the composer's followed-model metadata. Auto follows the routed record.
 `contextUsage.test.ts` pins the arithmetic — notably that the *latest*
 reporting assistant turn is the answer, not a sum across turns.
 
@@ -237,12 +239,16 @@ tokens, the fill is `compacted` and every surface shows a dash, never the older
 pre-compaction number. A compaction still running, or one that failed, has not
 changed the window, so the previous reading stays.
 
-Two further rules on this readout:
+Further rules on this readout:
 
-- The displayed percentage is computed **unrounded**. `clampPercent` applies
-  `Math.round`, so routing the display value through it turned 33.6% into
-  "34.0%" and made the panel disagree with the header. Rounding is still right
-  for the colour threshold, which is what the header feeds it.
+- The Context row shows used / limit token counts rounded to whole thousands,
+  always with a lowercase `k`, and a whole-number percentage. Its
+  tooltip and accessible label retain full counts. Counts and percentage share
+  the same computed limit. Exceeding the selected model's limit makes the value,
+  icon and meter red and adds an explicit alert. Compacted fill stays unknown.
+
+- Arithmetic retains the unrounded percentage. Display and colour thresholds
+  round it independently; over-limit detection compares exact token counts.
 - When the model exposes no context limit, the percentage falls back to the
   store's own default limit instead of disappearing.
 

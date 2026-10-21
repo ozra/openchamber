@@ -3515,6 +3515,8 @@ export const dict = {
   'quota.pace.aria.behindMany': '{used} percent used, {delta} percentage points behind elapsed time',
   'chat.workStatus.ariaLabel': 'Work status',
   'chat.workStatus.context.label': 'Context',
+  'chat.workStatus.context.reading': '{used} / {limit} tokens ({percent}%)',
+  'chat.workStatus.context.overLimit': 'Context exceeds this model\'s limit',
   'chat.workStatus.cost.breakdown': 'Session {session} · Subagents {subagents}',
   'chat.workStatus.git.changedFileSingle': '{count} file changed',
   'chat.workStatus.git.changedFilePlural': '{count} files changed',

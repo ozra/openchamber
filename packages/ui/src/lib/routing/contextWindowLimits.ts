@@ -1,3 +1,5 @@
+import { findCatalogModel } from '@/lib/opencode/model';
+
 export type ContextWindowLimits = {
   /** 0 when unknown; the readouts then fall back to their own default. */
   context: number;
@@ -23,21 +25,7 @@ export const findAnsweringModelKey = (messages: readonly AnsweringMessage[]): st
   return null;
 };
 
-type SessionModelLike = { model?: { providerID: string; id: string } };
-
-/**
- * `provider/model` the session record runs on, or null. OpenCode 2.x keeps
- * the model on the session: a manual switch and an Auto-routed turn both land
- * here before any answer exists, so it is the authority the readouts measure
- * against first.
- */
-export const findSessionModelKey = (session: SessionModelLike | undefined): string | null => {
-  const model = session?.model;
-  if (!model?.providerID || !model.id) return null;
-  return `${model.providerID}/${model.id}`;
-};
-
-type ProviderModelLike = { id: string; limit?: { context?: number; output?: number } };
+type ProviderModelLike = { id: string; modelID: string; limit?: { context?: number; output?: number } };
 type ProviderLike = { id: string; models: readonly ProviderModelLike[] };
 
 /**
@@ -55,6 +43,6 @@ export const limitsForAnsweringModel = (
   const separator = answeringModelKey.indexOf('/');
   const providerId = answeringModelKey.slice(0, separator);
   const modelId = answeringModelKey.slice(separator + 1);
-  const model = providers.find((provider) => provider.id === providerId)?.models.find((entry) => entry.id === modelId);
+  const model = findCatalogModel(providers.find((provider) => provider.id === providerId)?.models, modelId);
   return { context: model?.limit?.context ?? 0, output: model?.limit?.output ?? 0 };
 };

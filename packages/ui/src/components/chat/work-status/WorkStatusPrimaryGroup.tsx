@@ -12,7 +12,6 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { resolveProjectForSessionDirectory } from '@/lib/projectResolution';
 import { useSessionUIStore } from '@/sync/session-ui-store';
-import { resolveUsageTone } from '@/lib/quota';
 import { sessionEvents } from '@/lib/sessionEvents';
 import { normalizePath } from '@/lib/pathNormalization';
 import { computeContextUsage } from './contextUsage';
@@ -20,7 +19,6 @@ import { formatCost } from './subagentCost';
 import { useSubagentCostRollup } from './useSubagentCostRollup';
 import {
   WorkStatusCallout,
-  WorkStatusMeter,
   WorkStatusPill,
   WorkStatusRow,
   WorkStatusSection,
@@ -28,6 +26,7 @@ import {
 } from './WorkStatusPrimitives';
 import { useReportWorkStatusPresence } from './presenceContext';
 import { WorkStatusWarmingToggle } from './WorkStatusWarmingToggle';
+import { WorkStatusContextRow } from './WorkStatusContextRow';
 import { changeRequestCopy } from '@/lib/source-control/changeRequestCopy';
 import { formatChangeRequestReference } from '@/lib/source-control/identity';
 import { ProjectActionsButton } from '@/components/layout/ProjectActionsButton';
@@ -44,12 +43,6 @@ type Props = {
   /** Lets the panel place the two readouts independently without duplicating their subscriptions. */
   children: (sections: { session: React.ReactNode; repository: React.ReactNode }) => React.ReactNode;
 };
-
-// Matches the header readout exactly: one decimal, capped the same way, so the
-// two places that report context fill never disagree by a rounding step.
-const formatPercent = (percent: number): string => `${Math.min(percent, 999).toFixed(1)}%`;
-/** Shown after a compaction, until a response reports how much the window holds. */
-const UNKNOWN_PERCENT = '\u2014';
 
 /**
  * The persistent readouts — how full the context is, what the working tree and
@@ -235,16 +228,6 @@ export const WorkStatusPrimaryGroup: React.FC<Props> = ({ sessionId, directory, 
           : attentionReason === 'bisect' ? t('chat.workStatus.attention.bisect')
             : null;
 
-  const usagePercent = contextUsage?.state === 'measured' ? contextUsage.percent : null;
-  // Colour threshold uses the rounded percentage, matching what the header
-  // feeds `resolveUsageTone`; the displayed number stays unrounded.
-  const usageTone = usagePercent === null ? null : resolveUsageTone(Math.round(usagePercent));
-  // Same tone ramp as the header's context icon — healthy is success, not
-  // primary, so a full bar reads as a warning rather than as brand colour.
-  const meterColor = usageTone === 'critical' ? 'var(--status-error)'
-    : usageTone === 'warn' ? 'var(--status-warning)'
-      : 'var(--status-success)';
-
   // Rollup total: own cost plus every descendant subagent's cost, recursively
   // (see useSubagentCostRollup). Shown here instead of session.cost alone, so
   // spend that ran in a spawned subagent doesn't hide from the reader.
@@ -265,28 +248,12 @@ export const WorkStatusPrimaryGroup: React.FC<Props> = ({ sessionId, directory, 
         <WorkStatusSection title={t('chat.workStatus.section.session')}>
           {contextUsage !== null ? (
             <>
-              <WorkStatusRow
-                icon="donut-chart"
+              <WorkStatusContextRow
+                usage={contextUsage}
                 onClick={directory ? openContext : undefined}
-                ariaLabel={t('chat.workStatus.action.openContext')}
-                label={t('chat.workStatus.context.label')}
-                value={(
-                  <>
-                    {/* Keeping the cache warm is about this context, so its switch sits on the row. */}
-                    <WorkStatusWarmingToggle sessionId={sessionId} directory={directory} />
-                    <WorkStatusValue>{usagePercent !== null ? formatPercent(usagePercent) : UNKNOWN_PERCENT}</WorkStatusValue>
-                    {/* No icon of its own: the sprite has no currency glyph, and
-                        spend belongs with consumption anyway. The `$` labels it. */}
-                    {cost !== null ? <WorkStatusValue tone="muted">{formatCost(cost)}</WorkStatusValue> : null}
-                  </>
-                )}
+                warming={<WorkStatusWarmingToggle sessionId={sessionId} directory={directory} />}
+                cost={cost !== null ? <WorkStatusValue tone="muted">{formatCost(cost)}</WorkStatusValue> : null}
               />
-              <WorkStatusMeter percent={usagePercent ?? 0} color={meterColor} />
-              {contextUsage.state === 'compacted' ? (
-                <p className="mx-1 mb-1 text-[11px] leading-4 text-muted-foreground">
-                  {t('contextUsage.compacted.description')}
-                </p>
-              ) : null}
               {/* Caption, not a row: it explains the figure above it rather
                   than reporting a reading of its own, so it carries no icon
                   and no label column. */}
