@@ -119,6 +119,11 @@ export interface Theme {
       /** Optional per-tool prefix label colors, keyed by normalized tool name (see normalizeToolLabelKey). */
       labels?: Record<string, string>;
     };
+    /** Fork (OCH-001): timeline rail colors. */
+    timelineRail?: {
+      /** Records OpenCode adds itself (notices, compactions, switches). */
+      system?: string;
+    };
   };
 
   config?: {
@@ -131,6 +136,13 @@ export interface Theme {
       fast?: string;
       normal?: string;
       slow?: string;
+    };
+    /** Fork (OCH-001): how the timeline rail paints its spans. */
+    timelineRail?: {
+      /** Span opacity at rest, 0 to 1. */
+      restOpacity?: number;
+      /** OKLCH lightness, 0 to 1, that tool and thinking spans are lifted to at least. */
+      minLightness?: number;
     };
   };
 }

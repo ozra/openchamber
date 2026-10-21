@@ -37,8 +37,15 @@ const definition = z.object({
     // PRD-011 (fork): `labels` carries per-tool prefix label colours. Upstream
     // has no such field, so it is accepted here as a free-form colour map.
     tools: z.object({ border: color.optional(), icon: color.optional(), title: color.optional(), description: color.optional(), edit: optionalColors(['addedBackground', 'removedBackground', 'modifiedBackground', 'lineNumber']).optional(), labels: z.record(z.string(), color).optional() }).optional(),
+    // OCH-001 (fork): the timeline rail's system-record color; the variant
+    // default applies without it (cssGenerator).
+    timelineRail: z.object({ system: color.optional() }).optional(),
   }),
-  config: z.object({ fonts: z.object({ sans: cssValue.optional(), mono: cssValue.optional(), heading: cssValue.optional() }).optional(), transitions: z.object({ fast: cssValue.optional(), normal: cssValue.optional(), slow: cssValue.optional() }).optional() }).optional(),
+  // OCH-001 (fork): `timelineRail.restOpacity` sets the timeline rail's span
+  // opacity at rest and `timelineRail.minLightness` the OKLCH lightness its
+  // colored spans are lifted to; without them the variant defaults apply
+  // (cssGenerator).
+  config: z.object({ fonts: z.object({ sans: cssValue.optional(), mono: cssValue.optional(), heading: cssValue.optional() }).optional(), transitions: z.object({ fast: cssValue.optional(), normal: cssValue.optional(), slow: cssValue.optional() }).optional(), timelineRail: z.object({ restOpacity: z.number().min(0).max(1).optional(), minLightness: z.number().min(0).max(1).optional() }).optional() }).optional(),
 });
 
 export type ThemeDefinition = z.input<typeof definition>;
@@ -90,6 +97,7 @@ function resolveTheme(source: z.output<typeof definition>): Theme {
       chat: c.chat,
       markdown: c.markdown,
       tools: c.tools,
+      timelineRail: c.timelineRail,
     },
     config,
   };

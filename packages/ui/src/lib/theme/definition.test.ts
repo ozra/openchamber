@@ -32,9 +32,35 @@ describe('compact theme definitions', () => {
     const css = new CSSVariableGenerator().generate(resolved);
     expect(css).toContain('--tools-label-shell: #F92672;');
     expect(css).toContain('--tools-label-thinking: #C8986A;');
-    // A tool the theme does not name (remote_bash, openchamber_web) takes the default.
+    // A tool the theme does not name (openchamber_web) takes the default.
     expect(css).toContain('--tools-label-default: #E6DB74;');
-    expect(getToolLabelColorVar('opencode.remote_bash')).toBe('var(--tools-label-remote-bash, var(--tools-label-default, var(--tools-title)))');
+    expect(getToolLabelColorVar('openchamber_web')).toBe('var(--tools-label-openchamber-web, var(--tools-label-default, var(--tools-title)))');
+    // remote_bash runs commands on another host: the red of the other write tools.
+    expect(css).toContain('--tools-label-remote-bash: #F92672;');
+    // The light preset maps the same tool groups to paper inks.
+    const light = themes.find((item) => item.metadata.id === 'monozrakai-light');
+    if (!light) throw new Error('Monozrakai light preset is missing');
+    const lightCss = new CSSVariableGenerator().generate(requireTheme(compactTheme(light)));
+    expect(lightCss).toContain('--tools-label-shell: #B5382B;');
+    expect(lightCss).toContain('--tools-label-default: #8C6410;');
+  });
+
+  test('the timeline rail rests lighter on light themes unless the theme says otherwise', () => {
+    const generator = new CSSVariableGenerator();
+    const dark = generator.generate(requireTheme(minimal));
+    expect(dark).toContain('--timeline-rail-rest-opacity: 1;');
+    expect(dark).toContain('--timeline-rail-min-lightness: 0;');
+    const light = generator.generate(requireTheme({ ...minimal, metadata: { ...minimal.metadata, variant: 'light' } }));
+    expect(light).toContain('--timeline-rail-rest-opacity: 0.55;');
+    expect(light).toContain('--timeline-rail-min-lightness: 0.62;');
+    const custom = generator.generate(requireTheme({ ...minimal, config: { timelineRail: { restOpacity: 0.7, minLightness: 0.5 } } }));
+    expect(custom).toContain('--timeline-rail-rest-opacity: 0.7;');
+    expect(custom).toContain('--timeline-rail-min-lightness: 0.5;');
+    expect(dark).toContain('--timeline-rail-system: #00FFFF;');
+    expect(light).toContain('--timeline-rail-system: #0097A7;');
+    const colored = generator.generate(requireTheme({ ...minimal, colors: { ...minimal.colors, timelineRail: { system: '#ff00ff' } } }));
+    expect(colored).toContain('--timeline-rail-system: #ff00ff;');
+    expect(themeSchema.safeParse({ ...minimal, config: { timelineRail: { restOpacity: 2 } } }).success).toBe(false);
   });
 
   test('resolves a complete rendering palette from the authored roles', () => {

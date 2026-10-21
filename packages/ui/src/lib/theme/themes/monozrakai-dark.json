@@ -22,7 +22,7 @@
     "surface": {
       "background": "#17150E",
       "foreground": "#F8F8F2",
-      "muted": "#2C2B24",
+      "muted": "#221F18",
       "mutedForeground": "#939390",
       "elevated": "#242319",
       "elevatedForeground": "#F8F8F2",
@@ -165,6 +165,7 @@
         "multiedit": "#F92672",
         "apply-patch": "#F92672",
         "patch": "#F92672",
+        "remote-bash": "#F92672",
         "todowrite": "#FD971F",
         "todoread": "#A6E22E",
         "read": "#A6E22E",

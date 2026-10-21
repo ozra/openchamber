@@ -204,6 +204,17 @@ Additive variant that replaces the upstream rail at its single mount point.
 - **Units are rem**, snapped to device pixels, so the rail follows the
   interface size setting like the rest of the UI. (UAT 2026-10-21.)
 - **Hover** outlines the hovered span and dims the others.
+- **Colors (UAT 2026-10-21):** prompts and replies share the text color
+  (white on dark, ink on light); the lane tells them apart. System records
+  take a loud theme color (`colors.timelineRail.system`, default `#00FFFF`
+  dark, `#0097A7` light) and stay opaque at rest. Light themes rest at 55%
+  and lift tool and thinking hues to a minimum OKLCH lightness; dark themes
+  rest at 100%. Both are theme-overridable (`config.timelineRail`).
+- **Overlap (UAT 2026-10-21):** a span that runs into the next one in its
+  lane shrinks by at most 30%, never below its width; the minimum length is
+  the span width, so the smallest mark is a circle.
+- **Height (UAT 2026-10-21):** the rail runs the full chat height, like the
+  scrollbar; the composer already pads its end edge by the rail's room.
 - **Non-prompt clicks** release live follow and ask the list for the message:
   the controller's message index skips v2 replies (no `parentID`), which
   `windowTurns.test.ts` pins. Whether that upstream rule is stale is open; see
@@ -248,6 +259,30 @@ iteration once v1 lands.
   view with user-ordered side and position and the shared width rules.
 - **OCH-002.** Range selection in the rail reflected in the trajectory ledger
   and Chat.
+- **Fix: loaded history is evicted within seconds (UAT 2026-10-21).** Loading
+  earlier history from the rail's up-arrow is thrown away again about 3 s
+  later. Lead: `ChatContainer` trims history `HISTORY_TRIM_DELAY_MS` (3 s)
+  after the view is pinned at the end, and the up-arrow loads without moving
+  the view, so a reader at the end is still pinned. Wanted: history the user
+  expanded stays while they work with the timeline, and is trimmed again only
+  once they are back to prompting or have left the timeline alone for a while.
+- **Rail context menu (idea, 2026-10-21).** Right-clicking the rail opens a
+  menu with: a filter dialog choosing which span kinds stand out (the others
+  stay visible at 20% opacity, always painted under the chosen ones), and a
+  toggle for the hover lens, which is also in Settings. Supersedes the
+  top-of-rail toggles described under "Message-type toggles".
+- **Hover lens (idea, 2026-10-21).** While hovering, a window like the
+  viewport frame magnifies the spans under the pointer: stretched along the
+  rail so tight calls separate, and about 25% wider. A hunting scope, not a
+  sniper scope; maybe overkill.
+- **Conversation map on hover (idea, 2026-10-21).** While hovering, every
+  prompt and each turn's last reply (before the next prompt, or the end) shows
+  a one-line box out from its position, cropped to a fitting width so it
+  doesn't reach far from the rail; the hovered span's box stays on top and
+  shows in full. No titles: prompts in a brighter grey and sticking out about
+  20 px further, mirroring their lane; replies a slightly less bright grey;
+  all with a translucent feel. A rough map of the conversation that gets the
+  pointer 90% of the way to what you're looking for.
 
 Dropped: approximate tokens-per-second in the title bar.
 

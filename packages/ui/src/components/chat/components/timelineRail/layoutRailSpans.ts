@@ -13,8 +13,8 @@ const RAIL_SIZES_REM = {
     spanWidth: 0.3125,
     /** Background between two lanes. */
     laneGap: 0.09375,
-    /** Shortest painted span: every span stays a visible mark. */
-    minLength: 0.1875,
+    /** Shortest painted span, the span's own width: the smallest mark is a circle. */
+    minLength: 0.3125,
     maxLength: 1.75,
     /**
      * A pointer this close to a span still reaches it. Between two spans the
@@ -53,6 +53,8 @@ export const resolveRailMetrics = (rootFontPx: number, devicePixelRatio: number)
 const LOG_CUTOFF = Math.log1p(RAIL_SPAN_CONTENT_CUTOFF);
 const LANE_INDEX = { start: 0, center: 1, end: 2 } satisfies Record<RailLane, number>;
 const SCALE_SEARCH_STEPS = 40;
+/** How much of its length a span gives up when it runs into the next one in its lane. */
+const OVERLAP_SHRINK_MAX = 0.3;
 const FILL_TOLERANCE_PX = 0.5;
 
 /** Painted length on the shared logarithmic content scale. */
@@ -170,6 +172,27 @@ const stackSpans = (located: readonly ContentSpan[], contentHeight: number, scal
     return { tops, anchors, total: Math.max(end, paintedEnd) };
 };
 
+/**
+ * A span that runs into the next span of its lane gives up length to end
+ * where that one starts, by at most OVERLAP_SHRINK_MAX and never below its
+ * width. Positions stay put; only the overlap that is left still overlaps.
+ */
+const shrinkLaneOverlaps = (placed: PlacedRailSpan[], metrics: RailMetrics): void => {
+    const lastInLane: Array<PlacedRailSpan | undefined> = [];
+    for (const entry of placed) {
+        const lane = LANE_INDEX[laneOfKind(entry.span.kind)];
+        const previous = lastInLane[lane];
+        if (previous) {
+            const room = entry.top - previous.top;
+            if (previous.length > room) {
+                const floor = Math.max(previous.length * (1 - OVERLAP_SHRINK_MAX), metrics.spanWidth);
+                previous.length = Math.min(previous.length, Math.max(room, floor));
+            }
+        }
+        lastInLane[lane] = entry;
+    }
+};
+
 const interpolate = (anchors: readonly Anchor[]) => (contentY: number): number => {
     let low = 0;
     let high = anchors.length - 1;
@@ -230,6 +253,7 @@ export const layoutRailSpans = ({ spans, rowGeometry, contentHeight, railHeight,
             overflows: entry.span.contentChars > RAIL_SPAN_CONTENT_CUTOFF,
         };
     });
+    shrinkLaneOverlaps(placed, metrics);
     return { placed, toRail: interpolate(anchors) };
 };
 

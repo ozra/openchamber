@@ -119,7 +119,7 @@ Add an override only when the default relationship does not fit your palette.
 
 Built-in JSON files in `packages/ui/src/lib/theme/themes/` show the supported overrides. The full syntax mapping is in `packages/ui/src/lib/theme/syntax.ts`.
 
-Optional `config.fonts` accepts `sans`, `mono` and `heading`. Optional `config.transitions` accepts `fast`, `normal` and `slow` CSS transition values.
+Optional `config.fonts` accepts `sans`, `mono` and `heading`. Optional `config.transitions` accepts `fast`, `normal` and `slow` CSS transition values. Optional `config.timelineRail` tunes the timeline rail beside the chat: `restOpacity` (0 to 1) sets how strongly it paints spans at rest, and `minLightness` (0 to 1, OKLCH lightness) lifts dark tool and thinking colors to at least that lightness. Without them, dark themes use 1 and 0, light themes 0.55 and 0.62. Optional `colors.timelineRail.system` colors the records OpenCode adds itself (notices, compactions, switches) on that rail; without it, dark themes use `#00FFFF` and light themes `#0097A7`.
 
 ## Tune the theme in the app
 

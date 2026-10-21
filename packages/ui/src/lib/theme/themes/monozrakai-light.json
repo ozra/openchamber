@@ -156,6 +156,31 @@
         "addedBackground": "#4FB54B25",
         "removedBackground": "#E54B4B25",
         "lineNumber": "#bfb5a4"
+      },
+      "labels": {
+        "bash": "#B5382B",
+        "shell": "#B5382B",
+        "write": "#B5382B",
+        "edit": "#B5382B",
+        "multiedit": "#B5382B",
+        "apply-patch": "#B5382B",
+        "patch": "#B5382B",
+        "remote-bash": "#B5382B",
+        "todowrite": "#9A4A1F",
+        "todoread": "#4F6B22",
+        "read": "#4F6B22",
+        "list": "#4F6B22",
+        "glob": "#4F6B22",
+        "grep": "#4F6B22",
+        "codesearch": "#4F6B22",
+        "webfetch": "#2B5A86",
+        "websearch": "#2B5A86",
+        "task": "#6B4688",
+        "subagent": "#6B4688",
+        "skill": "#6B4688",
+        "question": "#6B4688",
+        "thinking": "#80694F",
+        "default": "#8C6410"
       }
     }
   },

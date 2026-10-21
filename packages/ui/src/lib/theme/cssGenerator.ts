@@ -6,6 +6,17 @@ import { resolveSyntaxTokens } from './syntax';
 import { withOpacity } from './color';
 import { getReadableThemeColors } from './readableColors';
 
+// How the timeline rail paints spans when a theme says nothing (OCH-001):
+// full strength on dark themes; on light ones translucent, with dark hues
+// lifted to a minimum lightness so they don't read heavy on the page.
+const TIMELINE_RAIL_REST_OPACITY_DARK = 1;
+const TIMELINE_RAIL_REST_OPACITY_LIGHT = 0.55;
+const TIMELINE_RAIL_MIN_LIGHTNESS_DARK = 0;
+const TIMELINE_RAIL_MIN_LIGHTNESS_LIGHT = 0.62;
+// System records are rare and worth noticing, so they default to a loud cyan.
+const TIMELINE_RAIL_SYSTEM_DARK = '#00FFFF';
+const TIMELINE_RAIL_SYSTEM_LIGHT = '#0097A7';
+
 const hexToRgb = (value: string | undefined | null): string | null => {
   if (!value) {
     return null;
@@ -59,6 +70,19 @@ export class CSSVariableGenerator {
     if (theme.config) {
       cssVars.push(...this.generateConfigVariables(theme.config));
     }
+
+    // OCH-001 (fork): dark ink on a light background reads heavier than light
+    // ink on a dark one, so the timeline rail rests lighter on light themes.
+    const isDarkTheme = theme.metadata.variant === 'dark';
+    const railRestOpacity = theme.config?.timelineRail?.restOpacity
+      ?? (isDarkTheme ? TIMELINE_RAIL_REST_OPACITY_DARK : TIMELINE_RAIL_REST_OPACITY_LIGHT);
+    const railMinLightness = theme.config?.timelineRail?.minLightness
+      ?? (isDarkTheme ? TIMELINE_RAIL_MIN_LIGHTNESS_DARK : TIMELINE_RAIL_MIN_LIGHTNESS_LIGHT);
+    cssVars.push(`  --timeline-rail-rest-opacity: ${railRestOpacity};`);
+    cssVars.push(`  --timeline-rail-min-lightness: ${railMinLightness};`);
+    const railSystem = theme.colors.timelineRail?.system
+      ?? (isDarkTheme ? TIMELINE_RAIL_SYSTEM_DARK : TIMELINE_RAIL_SYSTEM_LIGHT);
+    cssVars.push(`  --timeline-rail-system: ${railSystem};`);
 
     return cssVars.join('\n');
   }

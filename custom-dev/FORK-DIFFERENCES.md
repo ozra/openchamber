@@ -24,7 +24,8 @@ Last verified 2026-09-09 against upstream/main at c498beaa6.
 Two new presets, `monozrakai-dark` and `monozrakai-light`, registered in
 `packages/ui/src/lib/theme/themes/presets.ts`, documented in
 `docs/CUSTOM_THEMES.md`. The dark preset uses the deeper `#17150E` surface
-background.
+background and a darker, slightly warm `#221F18` muted surface (sidebar and context
+panel).
 
 ### 2. Per-tool prefix label colors (OCH-011, done)
 
@@ -33,7 +34,11 @@ semantic colors instead of one fixed treatment. Owned by
 `lib/toolHelpers.ts` and `theme/cssGenerator.ts`. A tool the theme does not
 name takes `tools.labels.default` when the theme sets it (Monozrakai dark:
 yellow `#E6DB74`), then the generic tool title. The timeline rail (OCH-001)
-reads the same function.
+reads the same function. `remote_bash` takes the write tools' red in both
+Monozrakai presets. Monozrakai light maps the same tool groups to paper inks
+(vermilion for writes, sap green for reads, prussian blue for web, violet for
+agents, light walnut for thinking, ochre for the default); black stays for prompts
+and replies.
 
 ### 3. Quota usage pace against reset windows (OCH-020, done)
 
@@ -141,7 +146,16 @@ folder:
   `MessageListHandle.revealFoldedMessage` (the list's existing function).
 - `knip.json`: `PromptNavigatorRail.tsx` listed as a `packages/ui` entry, since
   nothing imports it any more.
+- Theme `colors.timelineRail.system` (`--timeline-rail-system`; default
+  `#00FFFF` dark, `#0097A7` light) and `config.timelineRail.restOpacity` and `.minLightness`
+  (`definition.ts`, `types/theme.ts`), emitted by `cssGenerator.ts` as
+  `--timeline-rail-rest-opacity` and `--timeline-rail-min-lightness` with
+  variant defaults (dark 1 and 0, light 0.55 and 0.62); documented in
+  `docs/CUSTOM_THEMES.md`.
 - `en.ts`: `chat.timelineRail.*` keys.
+- `styles/typography.css`: `--prompt-rail-room` is at least `12px + 1.25rem`,
+  so the composer stays clear of the full-height rail at small interface
+  sizes.
 
 When upstream changes `PromptNavigatorRail.tsx`, compare it with
 `TimelineRail.tsx` and port what applies.

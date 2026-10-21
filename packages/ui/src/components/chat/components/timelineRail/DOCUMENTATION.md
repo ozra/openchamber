@@ -20,6 +20,11 @@ The rail owns no transcript data. Rows and their positions come from `MessageLis
 - A span id is the part id, or the message id for records without parts. The rail is keyed by session, so view state never crosses conversations. Its key is prefixed (`timeline-rail:<session key>`): `MessageList` is a sibling keyed by the bare session key, and two siblings sharing a key left the previous transcript mounted under the new one on every switch.
 - Scrolling only moves the frame: it writes the frame's transform and height and renders nothing. React never writes the frame's height.
 - A wheel over the rail scrolls Chat, and a pointer never focuses the rail; only the toggle shortcut does, so keys stay with Chat.
+- Spans rest at the theme's `--timeline-rail-rest-opacity`: `config.timelineRail.restOpacity` when the theme sets it, otherwise 1 on dark themes and 0.55 on light ones (`cssGenerator.ts`). Hover dims the others to the same 0.47 ratio of that value.
+- Prompts and replies paint in the text color; system records in `--timeline-rail-system` (`colors.timelineRail.system`, otherwise `#00FFFF` dark and `#0097A7` light), opaque at rest.
+- A span that runs into the next span of its lane shrinks by at most 30% and never below its width; the minimum length is the span width.
+- The rail runs the chat's full height; the composer pads its end edge by the rail's room (`[data-prompt-rail]`, typography.css), at least `12px + 1.25rem`, so it never covers the rail at any interface size.
+- Tool and thinking spans are lifted to at least the theme's `--timeline-rail-min-lightness` (OKLCH; `config.timelineRail.minLightness`, otherwise 0 on dark themes and 0.62 on light ones). Prompts and replies stay ink. Engines without relative color syntax paint the plain color.
 - Moving the highlight re-renders only the spans it moves between (`RailSpanMark` is memoized; the ring and the dimming are CSS on `aria-selected` and `data-dimmed`).
 - Span content positions never go back, even when the list reports a stale row position.
 
@@ -40,6 +45,10 @@ Per-span hit elements padded to a minimum size overlap in a long session, where 
 ### Why long empty stretches are cut instead of drawn to scale
 
 A pure minimap left large holes wherever the transcript is tall but holds few spans: a long answer is one span of at most `maxLength` over a row that maps to far more, and the list's tail spacer adds another hole at the end. The layout cuts every empty stretch down to `gapMax`, then grows the scale until the spans fill the rail again, taking the smallest scale that does so, so dense parts keep their minimap spacing. The short gap that remains is the only sign of a cut; a line marking each one was tried and dropped as noise. The frame maps through the same piecewise anchors, so it moves slower across a cut stretch.
+
+### Why light themes rest translucent by default
+
+Dark ink on a light background reads heavier than light ink on a dark one, so full-strength label colors made the rail heavy on paper-like themes. A lower rest opacity on light themes also lets overlapping spans build up intensity, which shows where many calls sit tight. The default follows the theme variant, so every theme looks right without fork-specific settings, and a theme can override it. Translucency alone still left dark inks heavy on paper, so light themes also lift tool and thinking hues to a minimum OKLCH lightness, which brightens dark hues and leaves light ones alone. A per-theme rail palette was considered and rejected: it would drift from the prefix label colors.
 
 ### Why rem and not px
 

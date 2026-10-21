@@ -175,6 +175,27 @@ describe('layoutRailSpans', () => {
         }
     });
 
+    test('a span running into the next one in its lane shrinks by at most 30% and never below its width', () => {
+        // 1000 characters paint about 21.75 px. a sits at 0 (beside a tool
+        // call at 2), b at 4, c at 22.
+        const { placed } = layoutRailSpans({
+            spans: [span('a', 'r1', 1000), span('t', 'r1', 0, 10, 'tool'), span('b', 'r2', 1000), span('c', 'r3', 1000)],
+            rowGeometry: rows({ r1: { top: 0, size: 4 }, r2: { top: 4, size: 18 }, r3: { top: 22, size: 78 } }),
+            contentHeight: 100,
+            railHeight: 100,
+        });
+        const full = resolveSpanLength(1000, metrics);
+        const [a, t, b, c] = placed;
+        expect([a.top, t.top, b.top, c.top]).toEqual([0, 2, 4, 22]);
+        // 4 px of room: the 30% limit stops it short of b.
+        expect(Math.abs(a.length - (full * 0.7))).toBeLessThan(0.00001);
+        // 18 px of room is within the limit: it ends where c starts.
+        expect(Math.abs(b.length - (18))).toBeLessThan(0.00001);
+        expect(Math.abs(c.length - (full))).toBeLessThan(0.00001);
+        // The tool call in its own lane takes nothing away.
+        expect(t.length).toBe(resolveSpanLength(0, metrics));
+    });
+
     test('leaves out rows the list has not positioned', () => {
         const { placed } = layoutRailSpans({
             spans: [span('a', 'r1', 0), span('b', 'missing', 0)],

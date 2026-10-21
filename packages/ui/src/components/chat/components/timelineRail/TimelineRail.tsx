@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/useUIStore';
 
 import { useChatColumnActions } from '../../chatColumnSession';
-import { registerComposerInsetReader } from '../../composer/state/composerInsetReaders';
 import type { ChatMessageEntry } from '../../lib/turns/types';
 import type { MessageListHandle, MessageListTimelineLayout } from '../../MessageList';
 import {
@@ -48,8 +47,10 @@ type TimelineRailProps = {
 // clicks on the end of user bubbles stay with the bubbles.
 const GUTTER_WIDTH_REM = 1.75;
 // Keeps the rail clear of the chat's overlay scrollbar, which is sized in px
-// (6px wide, 4px in).
-const GUTTER_END_OFFSET_PX = 14;
+// (6px wide, 4px in). With the narrow gutter the rail then fits in the room
+// the composer leaves at its end edge (2rem, `[data-prompt-rail]`), so it
+// never covers the composer as it runs the full height.
+const GUTTER_END_OFFSET_PX = 12;
 const LANES_BY_INDEX: readonly RailLane[] = ['start', 'center', 'end'];
 // The hover card stays this far inside the rail's ends, so it never leaves the chat.
 const CARD_EDGE_CLEARANCE = '2.5rem';
@@ -58,6 +59,12 @@ const CARD_EDGE_CLEARANCE = '2.5rem';
 const LIST_HEADER_REM = 3;
 // A wheel step reported in lines (Firefox), in px.
 const WHEEL_LINE_PX = 20;
+// The message a jump lands on is tinted for a moment, as a message link is
+// (typography.css, `[data-message-link-target]`), so the eye finds it. The
+// length matches that animation.
+const FLASH_MS = 1200;
+// How long to wait for the target to mount and come into view, in frames.
+const FLASH_WAIT_FRAMES = 90;
 const CARD_SHOW_DELAY_MS = 220;
 const LAYOUT_MIN_INTERVAL_MS = 250;
 const CARD_HIDE_DELAY_MS = 160;
@@ -69,19 +76,23 @@ const KIND_LABEL_KEYS = {
     system: 'chat.timelineRail.kind.system',
 } satisfies Record<Exclude<RailSpanKind, 'tool'>, I18nKey>;
 
-/** Fill of a span: the same theme tokens its message-prefix label uses (OCH-011). */
+/**
+ * Fill of a span. Prompts and replies are the conversation, in the text
+ * color the chat shows them in; tool and thinking spans take the theme tokens
+ * of their message-prefix labels (OCH-011); system records take the rail's
+ * loud system color.
+ */
 const spanColor = (span: RailSpan): string => {
     switch (span.kind) {
         case 'user':
-            return 'var(--surface-foreground)';
         case 'agent':
-            return 'color-mix(in srgb, var(--surface-foreground) 45%, transparent)';
+            return 'var(--surface-foreground)';
         case 'reasoning':
             return 'var(--tools-label-thinking, var(--tools-title))';
         case 'tool':
             return span.toolFailed ? 'var(--status-error)' : getToolLabelColorVar(span.toolName ?? '');
         case 'system':
-            return 'var(--surface-muted-foreground)';
+            return 'var(--timeline-rail-system)';
     }
 };
 
@@ -101,35 +112,55 @@ const isSameMetrics = (a: RailMetrics, b: RailMetrics): boolean => (
     && a.hairline === b.hairline
 );
 
-const spanStyle = (placed: PlacedRailSpan, metrics: RailMetrics): React.CSSProperties => {
+/**
+ * Tool and thinking spans take the theme's lightness floor
+ * (`--timeline-rail-min-lightness`); prompts and replies stay ink.
+ */
+const isLiftedKind = (kind: RailSpanKind): boolean => kind === 'tool' || kind === 'reasoning';
+
+type SpanStyle = React.CSSProperties & { '--rail-span-color'?: string };
+
+// What a span paints with: its color, or the lifted color that `LIFT_CLASS`
+// sets as `--rail-span-paint` for tool and thinking spans. Fill, edge ring
+// and overflow dots all read it, so all three lift together.
+const SPAN_PAINT = 'var(--rail-span-paint, var(--rail-span-color))';
+// Tests the exact expression used, `max()` on a channel keyword included:
+// engines that know relative colors but not channel arithmetic skip it and
+// paint the plain color.
+const LIFT_CLASS = 'supports-[color:oklch(from_red_max(l,0.5)_c_h)]:[--rail-span-paint:oklch(from_var(--rail-span-color)_max(l,var(--timeline-rail-min-lightness,0))_c_h)]';
+
+const spanStyle = (placed: PlacedRailSpan, metrics: RailMetrics): SpanStyle => {
     const color = spanColor(placed.span);
     const dash = metrics.spanWidth / 2;
+    const { kind } = placed.span;
     return {
         top: placed.top,
         height: placed.length,
-        insetInlineStart: laneOffset(metrics, laneOfKind(placed.span.kind)),
+        insetInlineStart: laneOffset(metrics, laneOfKind(kind)),
         width: metrics.spanWidth,
-        // System and control records are dashed, so they read apart from
-        // user input by shape as well as tone.
-        background: placed.span.kind === 'system'
-            ? `repeating-linear-gradient(to bottom, ${color} 0 ${dash}px, transparent ${dash}px ${dash * 2}px)`
-            : color,
+        // System and control records are dashed, so they read apart from the
+        // other spans by shape as well as color.
+        '--rail-span-color': color,
+        background: kind === 'system'
+            ? `repeating-linear-gradient(to bottom, ${SPAN_PAINT} 0 ${dash}px, transparent ${dash}px ${dash * 2}px)`
+            : SPAN_PAINT,
         // An edge in the span's own hue mixed toward the chat background,
         // drawn outside the fill so the span keeps its width; it takes a
         // device pixel of the lane gap. Where calls of one kind sit back to
         // back, each start shows.
-        boxShadow: `0 0 0 ${metrics.hairline}px color-mix(in srgb, ${color} 45%, var(--surface-background))`,
+        boxShadow: `0 0 0 ${metrics.hairline}px color-mix(in srgb, ${SPAN_PAINT} 45%, var(--surface-background))`,
     };
 };
 
-const overflowMarkerStyle = (placed: PlacedRailSpan, metrics: RailMetrics): React.CSSProperties => {
+const overflowMarkerStyle = (placed: PlacedRailSpan, metrics: RailMetrics): SpanStyle => {
     const dot = Math.max(metrics.laneGap, metrics.spanWidth / 2);
     return {
+        '--rail-span-color': spanColor(placed.span),
         top: placed.top + placed.length + metrics.laneGap,
         height: dot * 5,
         insetInlineStart: laneOffset(metrics, laneOfKind(placed.span.kind)) + (metrics.spanWidth - dot) / 2,
         width: dot,
-        backgroundImage: `radial-gradient(circle, ${spanColor(placed.span)} 45%, transparent 55%)`,
+        backgroundImage: `radial-gradient(circle, ${SPAN_PAINT} 45%, transparent 55%)`,
         backgroundSize: `${dot}px ${dot * 1.5}px`,
     };
 };
@@ -147,6 +178,48 @@ const readRowGeometry = (state: MessageListTimelineLayout['state'], headerPx: nu
     return { top: top + headerPx, size: Math.max(0, size) };
 };
 
+/** The one flash a rail runs: the wait for its target, then the tint. */
+type PendingFlash = { frame: number | null; timer: number | null; element: HTMLElement | null };
+
+const cancelFlash = (pending: PendingFlash): void => {
+    if (pending.frame !== null) window.cancelAnimationFrame(pending.frame);
+    if (pending.timer !== null) window.clearTimeout(pending.timer);
+    pending.element?.removeAttribute('data-message-link-target');
+    pending.frame = null;
+    pending.timer = null;
+    pending.element = null;
+};
+
+/**
+ * Tints the message once it is mounted and on screen: after an unfold or a
+ * jump to a row the list had not mounted, that is a few frames later. A new
+ * flash ends the one before, so a quick second jump never inherits its timer.
+ */
+const flashMessageWhenShown = (pending: PendingFlash, scroller: HTMLElement, messageId: string): void => {
+    cancelFlash(pending);
+    let frames = 0;
+    const step = () => {
+        pending.frame = null;
+        const element = scroller.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(messageId)}"]`);
+        if (element) {
+            const rect = element.getBoundingClientRect();
+            const view = scroller.getBoundingClientRect();
+            if (rect.bottom > view.top && rect.top < view.bottom) {
+                // Set again from scratch, so a second jump to it replays the tint.
+                element.removeAttribute('data-message-link-target');
+                void element.offsetWidth;
+                element.setAttribute('data-message-link-target', '');
+                pending.element = element;
+                pending.timer = window.setTimeout(() => cancelFlash(pending), FLASH_MS);
+                return;
+            }
+        }
+        frames += 1;
+        if (frames < FLASH_WAIT_FRAMES) pending.frame = window.requestAnimationFrame(step);
+    };
+    pending.frame = window.requestAnimationFrame(step);
+};
+
 const isSamePlacement = (previous: readonly PlacedRailSpan[], next: readonly PlacedRailSpan[]): boolean => {
     if (previous.length !== next.length) return false;
     for (let index = 0; index < next.length; index += 1) {
@@ -160,8 +233,11 @@ const isSamePlacement = (previous: readonly PlacedRailSpan[], next: readonly Pla
 type RailSpanMarkProps = {
     id: string;
     label: string;
-    style: React.CSSProperties;
-    overflowStyle: React.CSSProperties | undefined;
+    style: SpanStyle;
+    lifted: boolean;
+    /** System records stay opaque at rest: they are rare and meant to be seen. */
+    loud: boolean;
+    overflowStyle: SpanStyle | undefined;
     selected: boolean;
     current: boolean;
 };
@@ -169,8 +245,11 @@ type RailSpanMarkProps = {
 // One span. Memoized with stable style objects, so moving the highlight
 // re-renders the two spans it moves between, not every span on the rail. The
 // ring and the dimming of the others come from CSS (`aria-selected` and the
-// lanes' `data-dimmed`).
-const RailSpanMark = React.memo(function RailSpanMark({ id, label, style, overflowStyle, selected, current }: RailSpanMarkProps) {
+// lanes' `data-dimmed`). At rest a span takes the theme's
+// `--timeline-rail-rest-opacity` (1 dark, 0.55 light by default), so
+// overlapping spans build up intensity; the dimmed ones keep the same ratio
+// to it as before (0.4 against 0.85).
+const RailSpanMark = React.memo(function RailSpanMark({ id, label, style, lifted, loud, overflowStyle, selected, current }: RailSpanMarkProps) {
     return (
         <>
             <div
@@ -180,17 +259,23 @@ const RailSpanMark = React.memo(function RailSpanMark({ id, label, style, overfl
                 aria-current={current ? 'true' : undefined}
                 aria-label={label}
                 className={cn(
-                    'absolute rounded-full opacity-85 transition-opacity duration-150',
-                    'group-data-[dimmed=true]/lanes:opacity-40',
+                    'absolute rounded-full transition-opacity duration-150',
+                    loud
+                        ? 'opacity-100 group-data-[dimmed=true]/lanes:opacity-47'
+                        : 'opacity-[var(--timeline-rail-rest-opacity,0.85)] group-data-[dimmed=true]/lanes:opacity-[calc(var(--timeline-rail-rest-opacity,0.85)*0.47)]',
                     'aria-selected:z-10 aria-selected:!opacity-100',
                     'aria-selected:[outline:var(--rail-ring)_solid_var(--surface-foreground)] aria-selected:[outline-offset:var(--rail-ring)]',
+                    lifted && LIFT_CLASS,
                 )}
                 style={style}
             />
             {overflowStyle ? (
                 <div
                     aria-hidden="true"
-                    className="absolute opacity-85 transition-opacity duration-150 group-data-[dimmed=true]/lanes:opacity-40"
+                    className={cn(
+                        'absolute opacity-[var(--timeline-rail-rest-opacity,0.85)] transition-opacity duration-150 group-data-[dimmed=true]/lanes:opacity-[calc(var(--timeline-rail-rest-opacity,0.85)*0.47)]',
+                        lifted && LIFT_CLASS,
+                    )}
                     style={overflowStyle}
                 />
             ) : null}
@@ -236,11 +321,6 @@ export function TimelineRail({
     highlightedIndexRef.current = highlightedIndex;
     const [isNarrowGutter, setIsNarrowGutter] = React.useState(false);
 
-    const setNavRef = React.useCallback((node: HTMLElement | null) => {
-        navRef.current = node;
-        return registerComposerInsetReader(node);
-    }, []);
-
     // Shrink the hit zone whenever the message column reaches under the
     // full-width gutter, so bubble clicks (expand/collapse) stay clickable.
     React.useEffect(() => {
@@ -260,8 +340,11 @@ export function TimelineRail({
         measure();
         const observer = new ResizeObserver(measure);
         observer.observe(container);
+        // The wide chat layout moves the message column without resizing the
+        // container; the scroller's content box changes with its padding.
+        if (scrollRef.current) observer.observe(scrollRef.current);
         return () => observer.disconnect();
-    }, []);
+    }, [scrollRef]);
 
     // The frame follows the scroll on every frame without a React render; it
     // maps through the same anchors as the spans. React never writes its
@@ -415,6 +498,12 @@ export function TimelineRail({
         return () => track.removeEventListener('wheel', handleWheel);
     }, [scrollRef]);
 
+    const pendingFlashRef = React.useRef<PendingFlash>({ frame: null, timer: null, element: null });
+    React.useEffect(() => {
+        const pending = pendingFlashRef.current;
+        return () => cancelFlash(pending);
+    }, []);
+
     const showTimerRef = React.useRef<number | null>(null);
     const hideTimerRef = React.useRef<number | null>(null);
     const pointerRef = React.useRef<{ x: number; y: number } | null>(null);
@@ -484,11 +573,13 @@ export function TimelineRail({
         if (!target) return;
         if (target.opensTurn && target.turnId) onSelectTurn(target.turnId);
         else onSelectMessage({ turnId: target.turnId, messageId: target.messageId, reasoning: target.kind === 'reasoning' });
+        const scroller = scrollRef.current;
+        if (scroller) flashMessageWhenShown(pendingFlashRef.current, scroller, target.messageId);
         cancelShow();
         setHighlightedIndex(null);
         closeKeyboardNav();
         trackRef.current?.blur();
-    }, [cancelShow, closeKeyboardNav, onSelectMessage, onSelectTurn]);
+    }, [cancelShow, closeKeyboardNav, onSelectMessage, onSelectTurn, scrollRef]);
 
     // A pointer never focuses the rail, so the keys stay with Chat; only the
     // toggle shortcut focuses it.
@@ -585,6 +676,8 @@ export function TimelineRail({
         id: optionId(entry.span),
         label: t('chat.timelineRail.spanLabel', { kind: kindLabel(entry.span), preview: entry.span.preview || emptyPreviewLabel }),
         style: spanStyle(entry, metrics),
+        lifted: isLiftedKind(entry.span.kind),
+        loud: entry.span.kind === 'system',
         overflowStyle: entry.overflows ? overflowMarkerStyle(entry, metrics) : undefined,
     })), [emptyPreviewLabel, kindLabel, metrics, optionId, placed, t]);
     const lanesStyle = React.useMemo<React.CSSProperties & Record<'--rail-ring', string>>(() => ({
@@ -594,12 +687,13 @@ export function TimelineRail({
 
     return (
         <nav
-            ref={setNavRef}
+            ref={navRef}
             aria-label={t('chat.timelineRail.aria')}
-            className="pointer-events-none absolute inset-e-3.5 top-3 z-20 flex flex-col items-end"
-            // The floating composer and any panel docked on it cover the
-            // bottom of the transcript; the rail ends above them.
-            style={{ bottom: 'calc(var(--chat-composer-inset, 0px) + var(--chat-floating-panel-clearance, 0px) + 12px)' }}
+            // Full height, like the scrollbar: while the rail is on, the
+            // composer pads its end edge by the rail's room
+            // (`[data-prompt-rail]` in typography.css), so it never covers it.
+            className="pointer-events-none absolute inset-y-3 z-20 flex flex-col items-end"
+            style={{ insetInlineEnd: GUTTER_END_OFFSET_PX }}
         >
             {canLoadEarlier ? (
                 <button
@@ -632,7 +726,7 @@ export function TimelineRail({
                 tabIndex={-1}
                 aria-activedescendant={highlighted ? optionId(highlighted.span) : undefined}
                 className="pointer-events-auto relative min-h-0 flex-1 cursor-default outline-none"
-                style={{ width: isNarrowGutter ? lanesWidth(metrics) + metrics.laneGap * 2 : `${GUTTER_WIDTH_REM}rem` }}
+                style={{ width: isNarrowGutter ? lanesWidth(metrics) : `${GUTTER_WIDTH_REM}rem` }}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handlePointerMove}
                 onMouseLeave={handlePointerLeave}
@@ -652,6 +746,8 @@ export function TimelineRail({
                             id={mark.id}
                             label={mark.label}
                             style={mark.style}
+                            lifted={mark.lifted}
+                            loud={mark.loud}
                             overflowStyle={mark.overflowStyle}
                             selected={index === highlightedIndex}
                             current={index === activeIndex}
@@ -667,8 +763,8 @@ export function TimelineRail({
                         'border border-[var(--surface-foreground)]/30 bg-[var(--surface-foreground)]/[0.06]',
                     )}
                     style={{
-                        insetInlineEnd: -metrics.laneGap * 2,
-                        width: lanesWidth(metrics) + metrics.laneGap * 4,
+                        insetInlineEnd: -metrics.laneGap,
+                        width: lanesWidth(metrics) + metrics.laneGap * 2,
                     }}
                 />
                 {highlighted ? (
