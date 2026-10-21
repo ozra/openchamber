@@ -30,7 +30,10 @@ background.
 
 Tool, reasoning and user-prompt prefix labels in the chat render with per-tool
 semantic colors instead of one fixed treatment. Owned by
-`lib/toolHelpers.ts` and `theme/cssGenerator.ts`.
+`lib/toolHelpers.ts` and `theme/cssGenerator.ts`. A tool the theme does not
+name takes `tools.labels.default` when the theme sets it (Monozrakai dark:
+yellow `#E6DB74`), then the generic tool title. The timeline rail (OCH-001)
+reads the same function.
 
 ### 3. Quota usage pace against reset windows (OCH-020, done)
 
@@ -123,6 +126,25 @@ English dict and spread it first (`...enDict`) inside their own dict. Effect: fo
 i18n keys live in `en.ts` only and read as English on other locales, and the
 upstream key-parity test stays green without editing it. Four stale keys left by
 the old `TRANSLATE ME` convention were deleted (`de.settings.ts`, `tr.settings.ts`).
+
+### 12. Timeline rail replaces the prompt rail (OCH-001, in-progress)
+
+`TimelineRail` (`components/chat/components/timelineRail/`) mounts where
+`PromptNavigatorRail` did and keeps its setting and shortcut. Edits outside that
+folder:
+
+- `ChatContainer.tsx`: the imports, the mount block in `ChatViewport`, and an
+  `onSelectMessage` prop (type, destructure, memo comparator, the
+  `handleTimelineRailSelectMessage` callback, call site).
+- `MessageList.tsx`: `MessageListHandle.getTimelineLayout()` and the
+  `MessageListTimelineLayout` type, plus `allEntriesRef` behind it, and
+  `MessageListHandle.revealFoldedMessage` (the list's existing function).
+- `knip.json`: `PromptNavigatorRail.tsx` listed as a `packages/ui` entry, since
+  nothing imports it any more.
+- `en.ts`: `chat.timelineRail.*` keys.
+
+When upstream changes `PromptNavigatorRail.tsx`, compare it with
+`TimelineRail.tsx` and port what applies.
 
 ## Keeping this current
 

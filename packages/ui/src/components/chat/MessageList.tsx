@@ -145,6 +145,15 @@ export interface MessageListHandle {
     holdViewportAnchor: (anchor: { messageId: string; offsetTop: number }) => void;
     isHistoryVirtualized: () => boolean;
     scrollToBottom: () => void;
+    /** Fork (OCH-001): the rows the list renders and its geometry for them, read by the timeline rail. */
+    getTimelineLayout: () => MessageListTimelineLayout | null;
+    /** Fork (OCH-001): opens the folded turn activity holding a message; true when it had to open it. */
+    revealFoldedMessage: (messageId: string) => boolean;
+}
+
+export interface MessageListTimelineLayout {
+    entries: readonly TimelineEntry[];
+    state: ReturnType<LegendListRef['getState']>;
 }
 
 type RenderEntry = TimelineEntry;
@@ -976,6 +985,8 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>(({
     const allEntries = React.useMemo(() => {
         return trailingStreamingEntry ? [...historyEntries, trailingStreamingEntry] : historyEntries;
     }, [historyEntries, trailingStreamingEntry]);
+    const allEntriesRef = React.useRef(allEntries);
+    allEntriesRef.current = allEntries;
 
     // Stable identities: these reach the list, where a changing callback would
     // re-render every mounted row.
@@ -1361,6 +1372,13 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>(({
                 // maximum (scrollHeight is integer-rounded).
                 container.scrollTop = container.scrollHeight + 4096;
             },
+
+            getTimelineLayout: () => {
+                const list = listRef.current;
+                return list ? { entries: allEntriesRef.current, state: list.getState() } : null;
+            },
+
+            revealFoldedMessage,
         };
 
         if (typeof ref === 'function') {
@@ -1375,7 +1393,7 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>(({
         return () => {
             objectRef.current = null;
         };
-    }, [alignViewportAnchor, findMessageElement, isMessageCut, messageIndexMap, mountWindowedMessage, resolveScrollContainer, scrollHistoryIndexIntoView, scrollMessageElementIntoView, settleNavigationTarget, turnIndexMap, ref]);
+    }, [alignViewportAnchor, findMessageElement, isMessageCut, messageIndexMap, mountWindowedMessage, resolveScrollContainer, revealFoldedMessage, scrollHistoryIndexIntoView, scrollMessageElementIntoView, settleNavigationTarget, turnIndexMap, ref]);
 
     const rowContext = React.useMemo(() => ({
         scrollToBottom: stableScrollToBottom,

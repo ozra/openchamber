@@ -16,10 +16,14 @@ export function normalizeToolLabelKey(toolName: string): string {
   return key.replace(/_+/g, '-');
 }
 
-/** CSS var referencing a tool's prefix label color, falling back to the generic tool title. */
+/**
+ * CSS var referencing a tool's prefix label color. A tool the theme does not
+ * name takes the theme's `tools.labels.default`, then the generic tool title.
+ */
 export function getToolLabelColorVar(toolName: string): string {
   const key = normalizeToolLabelKey(toolName);
-  return key ? `var(--tools-label-${key}, var(--tools-title))` : 'var(--tools-title)';
+  const fallback = 'var(--tools-label-default, var(--tools-title))';
+  return key ? `var(--tools-label-${key}, ${fallback})` : fallback;
 }
 import { normalizeToolName } from '@/lib/opencode/tools';
 import {

@@ -88,15 +88,24 @@ levels. Clamp entries at or above the cutoff to `maxLength`, and add a vertical
 overflow marker only when `contentChars > cutoff`. User prompts and parsed
 question answers use this same function.
 
-Paint and hit geometry are separate. A short span keeps its calculated painted
-length but receives invisible padding up to `minHitLength` across the usable
-rail width. If padded targets meet, partition the space at the midpoint between
-their transcript positions. This keeps every span clickable without changing
-its visual size, transcript position, or the viewport map.
+Paint and hit geometry are separate. The whole rail is one pointer target: a
+point reaches the nearest span within a fixed reach (8 px), so a short span stays
+clickable beyond its painted length, the gap between two spans splits at the
+midpoint, and overlapping spans resolve to the later one, which paints on top.
+This keeps every span clickable without changing its visual size, transcript
+position, or the viewport map.
 
 This length is visual metadata. Transcript coordinates still determine the
-span's position and the viewport frame, so content sizing never changes the
-rail's mapping to Chat.
+span's position and the viewport frame. Empty stretches longer than
+`gapMax` are cut to it and the scale grows to fill the rail; the short gap that
+remains marks the cut. The frame maps through the same anchors.
+
+The pointer lookup also weighs the lane: each lane between the pointer and a
+span adds `lanePenalty` to its distance, so pointing at a prompt picks the
+prompt over a tool call level with it.
+
+Rail sizes are specified in rem, so they follow the interface size setting, and
+resolved to px snapped to device pixels.
 
 ### Time mode
 
@@ -138,33 +147,23 @@ spans. A live one-second tick updates only spans with an authoritative active
 start. If mode or anchor changes need a visual transition, use transform or
 opacity; do not animate layout geometry.
 
-## Timing and tokens-per-second
+## Timing
 
 Governing constraint (`packages/ui/src/sync/DOCUMENTATION.md`): the protocol does
 **not** mark where a turn begins, only where it ends. Repeated `busy` events mean
 "still running", not "just started".
 
 This does not invalidate the Time length mode. That mode accepts only complete
-part start/end pairs or whole-message created/completed pairs. It does not use
-the approximate turn timing described below.
-
-Consequences:
-
-- Tokens are server-reported and real (`message.info.tokens` breakdown,
-  `stores/utils/tokenUtils.ts:54-78`).
-- The only available time denominator is creation deltas, which include network
-  and server latency.
-- Approx tps = tokens ÷ creation-delta window. **Always label approximate**.
-- Hide tps when token data is unavailable.
-
-Do not fabricate turn-start/first-token times or present derived values as
-measured throughput.
+part start/end pairs or whole-message created/completed pairs, never a turn
+start derived from creation deltas. Do not fabricate turn-start or first-token
+times.
 
 ## Interaction model
 
-Clicking a span/line scrolls the chat to that message, reusing the existing
-on-select-turn jump from `PromptNavigatorRail`. Bidirectional rail ⇄ ledger ⇄
-chat sync is a later phase (see OCH-002).
+Clicking a span scrolls the chat to that message through the timeline
+controller: a prompt that opens its turn uses the turn jump the prompt rail
+used, every other span the message jump. Bidirectional rail ⇄ ledger ⇄ chat
+sync is a later phase (see OCH-002).
 
 ## Conversation decoration registry
 
@@ -204,7 +203,10 @@ extent. It updates on scroll, resize, history prepend, and measurement changes.
 
 The timeline controller remains the scroll and anchoring authority. The rail
 must not reconstruct geometry from whichever virtualized message nodes happen
-to be mounted. When earlier history is incomplete, preserve an explicit load
+to be mounted. In v1 the rail reads the list's rows and LegendList state through
+`MessageListHandle.getTimelineLayout()`, takes the extent and the frame from the
+scroll node, and spreads a row's spans inside it by estimated rendered height
+(`components/chat/components/timelineRail/DOCUMENTATION.md`). When earlier history is incomplete, preserve an explicit load
 boundary rather than presenting the materialized extent as the complete
 session.
 

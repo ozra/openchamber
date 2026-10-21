@@ -1,315 +1,279 @@
 ---
-status: refine
+status: review
 created: 2026-09-01
 related: ["OCH-002","OCH-011","OCH-018","OCH-019","OCH-022","OCH-023"]
 kind: "feature"
 aliases: ["PRD-001"]
+depends_on: []
+complexity: medium
+estimated_effort: "3"
 ---
 
 # TimelineRail
 
 ## Goal
 
-Turn the existing prompt-navigator rail into a slim, full-height timeline rail
-that shows the flow of user, agent, and tool activity in miniature. When
-enabled, this timeline scrollbar is the compact overview of a session, usable
-for quick navigation and for reading the shape of a turn.
+Replace the prompt-navigator rail with a slim timeline rail that shows the flow
+of user, agent, and tool activity in miniature, plus a minimap frame showing
+which part of the transcript Chat currently shows. It is the compact overview
+of a session, used for quick navigation and for reading the shape of a turn.
 
 ## Background
 
-The repo already has a vertical gutter of ticks on the chat's right edge, one
-tick per user prompt, with hover preview, click-to-jump, keyboard navigation,
-and a load-earlier boundary:
+The chat's right edge has a vertical gutter of ticks, one per user prompt, with
+hover preview, click-to-jump, keyboard navigation, and a load-earlier button:
 
 - `packages/ui/src/components/chat/components/PromptNavigatorRail.tsx`
-- mounted at `packages/ui/src/components/chat/ChatContainer.tsx:517`
-
-This feature builds on that pattern: each single user tick becomes a small
-three-lane strip showing the full turn flow.
+- mounted once, in `ChatViewport`, `packages/ui/src/components/chat/ChatContainer.tsx:587-597`
+- gated by the `promptNavigatorEnabled` setting ("Prompt navigator"), hidden on
+  mobile and in expanded input; the toggle shortcut drives
+  `isPromptNavigatorPanelOpen` in `useUIStore`.
 
 ## Component strategy
 
-Build a fully independent fork-owned `TimelineRailView` component beside
-`PromptNavigatorRail`. It is not a mode, conditional rendering branch, or
-expanded prop set inside the original rail.
-Start from a direct copy where that best preserves hover, keyboard, load-earlier,
-and jump behavior. Keep the original prompt navigator available as an
-independently selectable legacy view so both can be compared and upstream rail
-improvements can be ported deliberately.
+Additive variant that replaces the upstream rail at its single mount point.
 
-Share the authoritative turn projection, scroll/navigation controller, and
-history-loading contracts. Do not duplicate message synchronization or create a
-second source of turn truth. Core changes should be limited to PRD-019 view
-registration/layout and the narrow preview/navigation contracts both rails use.
+- Build a fork-owned `TimelineRail` component in its own files under
+  `packages/ui/src/components/chat/components/` (component, plus pure modules for
+  span projection, sizing, and geometry). Start from a copy of
+  `PromptNavigatorRail` where that preserves hover, keyboard, load-earlier, and
+  jump behavior.
+- The upstream integration is the import and the JSX block in `ChatViewport`:
+  `PromptNavigatorRail` is swapped for `TimelineRail`, a change of a few lines.
+  `TimelineRail` takes the data `ChatViewport` already has (rendered messages,
+  turn ids, active turn, select/jump callbacks, load-earlier state, scroll
+  container ref). Shaping its props to fit what is there keeps the
+  merge-sensitive edit small; projection happens inside the fork's files.
+- `PromptNavigatorRail.tsx` stays in the repo unmodified and is no longer
+  mounted. There is no setting to choose between the two. When upstream changes
+  it, compare and port useful improvements into `TimelineRail` deliberately.
+- Reuse the existing `promptNavigatorEnabled` setting, its Settings row, the
+  toggle shortcut, and `isPromptNavigatorPanelOpen` as they are. No new settings
+  in v1.
+- Shared and not duplicated: message sync, the turn projection, the timeline
+  scroll controller, history loading, and `useChatTurnNavigation`.
+- If geometry needs a seam the list does not expose yet (see Open questions),
+  add it narrowly on the timeline/list side and record it in
+  `custom-dev/FORK-DIFFERENCES.md`.
 
-## Requirements
+## Requirements (v1)
 
 ### Placement and shape
 
-- The timeline rail is a normal stackable view governed by PRD-019. Its side
-  and position follow user view order rather than a hardcoded Chat edge.
-- Default order may place it immediately beside Chat, preserving the current
-  rail relationship until the user reorders it.
-- The rail spans the full stack height and is as slim as possible (it already is
-  roughly 12–28px; keep minimum, normal, and maximum-normal widths close).
-- One strip per turn, positioned along the rail like the existing ticks.
+- Same place as today: an overlay on the chat viewport's end edge (right in LTR),
+  clear of the overlay scrollbar. Unlike the current rail, which is vertically
+  centered with a fixed tick pitch, it spans the full height of the chat
+  viewport.
+- As slim as possible; the current rail is 12 to 28px. Keep the narrow-gutter
+  behavior that stops the rail from swallowing clicks on user bubbles.
+- Shown under the same conditions as the current rail: the setting is on, not
+  mobile, not expanded input, and at least two turns.
 
-### Message-type toggles
+### Spans and lanes
 
-- Put a compact set of message-type toggles at the top of the rail. These are
-  tiny square, blob, or dot controls suited to the rail width, not regular
-  checkbox components squeezed below their usable size.
-- Provide one toggle for each displayed class: user-originated input, agent
-  output, tool/activity, and system/control when that class is present.
-- All classes are enabled initially. Turning off every class except
-  user-originated input gives the focused prompt-navigation view of the legacy
-  prompt rail.
-- A disabled class has no visible spans or hover/click targets. Its decoration
-  state remains retained and applies again if the class is re-enabled.
-- Filtering changes visibility only. It does not reflow transcript coordinates
-  or move the viewport frame, which must remain aligned with Chat.
-- Treat this as temporary view state: preserve it through responsive auto-hide,
-  but reset to all enabled when TimelineRail closes or changes conversation.
-- Each tiny control remains keyboard reachable and has an accessible name,
-  pressed state, tooltip, and visible enabled/disabled distinction. Do not rely
-  on color alone.
-
-### Span-length mode
-
-- Put a compact two-state length-mode control beside the message-type toggles so
-  it is available directly from the rail. It switches between Content and Time
-  without opening Settings.
-- Use the shared sprite `Icon` with a changing content-size or clock symbol.
-  Translate its accessible state name and tooltip, such as "Span length:
-  Content" or "Span length: Time". The control is keyboard reachable and does
-  not rely on icon shape alone.
-- Content is the default. Persist the chosen mode as a TimelineRail preference
-  across conversations and responsive auto-hide. Closing the rail does not
-  reset it.
-- Switching mode changes painted span lengths only. It does not reflow
-  transcript coordinates, move the viewport frame, change filtering, or replace
-  span identities and navigation targets.
-
-### Transcript map and viewport
-
-- The rail is a minimap of the materialized conversation, not an unrelated
-  fixed-pitch list. Rail spans and the viewport frame use the same normalized
-  transcript coordinate model.
-- Draw a translucent outlined frame over the rail showing the portion of Chat
-  currently visible, like the viewport box in an editor minimap.
-- Derive span positions and viewport bounds from geometry published by the chat
-  timeline or virtualizer controller. `TimelineRailView` must not maintain a
-  competing scroll model or infer authoritative positions by querying mounted
-  message DOM on its own.
-- Update the frame while Chat scrolls, resizes, prepends older history, or
-  accepts changed virtualizer measurements. Preserve the current Chat anchor
-  while complete-history loading changes the mapped extent.
-- Keep the existing load-earlier boundary visible while older history is not
-  materialized. Do not make the frame imply that loaded records are the complete
-  session when the loader says otherwise.
-- The frame is presentation only and does not intercept span hover, click, or
-  keyboard navigation.
-
-### Three lanes — offset, not columns
-
-- User message spans are **left-aligned**.
-- Agent message spans are **centered**.
-- Tool message spans are **right-aligned**.
-- This must **not** be three rigid columns. A few pixels of left/center/right
-  difference is enough to convey the lane, because spans also have distinct
-  colors. Lane is conveyed by color first, offset second.
-- A turn with many tool calls still reads as a clear right-side cluster.
-- System/control spans use the centered geometry with a distinct neutral
-  treatment. They remain a separate filter class and never count as agent
-  output.
-
-### User-originated input vs system/scope/control
-
-- Actual user input must be visually distinct from system/scope/control
-  messages (plan-mode hidden user messages, `role === 'system'` messages,
-  header/control messages).
-- **Approach (initial):** give the different kinds distinct tonal variants of
-  styling/color first, then evaluate whether some groups feel better styled the
-  same and unify where it reads better. Not fixed in advance.
+- One span per user message, agent text output, reasoning block, and tool call
+  in the materialized conversation, positioned along the rail by transcript
+  position.
+- Lanes are offsets, not columns. User spans are start-aligned, agent spans
+  centered, tool spans end-aligned. A few pixels of offset is enough because
+  lanes also differ by color; color first, offset second. A turn with many tool
+  calls reads as a clear end-side cluster.
+- System/control messages (`role === 'system'`, synthetic-role messages such as
+  plan-mode injections, header/control messages) use the centered geometry with
+  a distinct neutral treatment, and never read as user input or agent output.
+- Question tools render as ordinary tool spans in v1 (WIP; OCH-023 handles
+  answers later).
+- Every span carries stable `spanId`, `turnId`, `messageId`, optional `partId`,
+  and its semantic kind, so later decorations and Find can target it without
+  reshaping the projection.
 
 ### Span length
 
-- In Content mode, every user, agent, tool/activity, and system/control span
-  derives its visual length from the amount of user-visible content represented
-  by that span.
-- Use one continuous logarithmic content scale rather than message-type
-  thresholds or size tiers:
+- Painted length follows represented content, on one continuous logarithmic
+  scale:
 
   ```text
   ratio = log1p(min(contentChars, 10,000)) / log1p(10,000)
   length = minLength + ratio * (maxLength - minLength)
   ```
 
-- Count the source text that the span represents, including visible tool input
-  and output. Exclude hidden fields, credentials, and presentation-only labels.
-  A span with no meaningful text uses `minLength`.
-- `minLength` is a hard visual floor. Every projected span remains visibly
-  distinct at every supported rail size and zoom level; no span may collapse to
-  a zero-length line or subpixel artifact.
-- Give each span an interaction target at least as long as `minHitLength`, using
-  invisible padding when its painted length is smaller. The hit target spans the
-  usable rail width. Where neighboring padded targets would overlap, divide the
-  shared space at the midpoint between their transcript positions so each point
-  activates exactly one span.
-- At 10,000 characters, clamp the span to `maxLength`. Content beyond that
-  cutoff adds a compact vertical ellipsis marker, or a horizontal ellipsis
-  rotated 90 degrees, to show that the entry is longer than the rail can encode.
-  The marker belongs to the same span and does not add a separate hit target.
-- In Content mode, user prompts and question-tool answers follow this same
-  formula. They differ from other message types by lane and intrinsic color,
-  not by sizing rules.
-- In Time mode, agent, tool/activity, and system/control spans use a continuous
-  logarithmic duration scale with a five-minute cutoff between the same
-  `minLength` and `maxLength`.
-  Accept duration only from valid authoritative start/end fields on the part or
-  from created/completed fields when the span represents the whole message.
-  Never infer duration from neighboring entries, repeated busy events, or the
-  wall-clock gap around a persisted record.
-- A non-user span with missing, incomplete, or invalid timing data falls back to
-  the Content-mode formula. A live span with an authoritative start may grow
-  from elapsed time no more than once per second, then settle to its
-  authoritative duration when the end arrives. A closed, auto-hidden, or
-  Content-mode rail performs no elapsed-time updates.
-- User prompts and user-originated question answers always remain content-sized.
-  In Time mode, anchor their content curve to the median painted length of valid,
-  completed timed spans in the materialized conversation. Use the midpoint
-  between `minLength` and `maxLength` when no timed sample exists. Apply the
-  median-based formula in `DOCUMENTATION.md` so short and long user inputs remain
-  distinguishable without dominating or disappearing beside timed spans.
-- Recalculate the Time-mode user anchor when the materialized-history boundary
-  changes. Do not update the anchor for every streaming part or animation frame.
-  If the visual length change is animated, use transform or opacity rather than
-  animating layout geometry.
-- Painted length does not change the span's transcript position or the viewport
-  frame. Both remain tied to Chat geometry.
+- Count user-visible source text, including visible tool input and output.
+  Exclude hidden fields, credentials, and presentation-only labels. A span with
+  no meaningful text uses `minLength`.
+- `minLength` is a hard visual floor at every supported rail size and zoom; no
+  span collapses to a zero-length line or subpixel artifact.
+- Content beyond 10,000 characters clamps to `maxLength` and adds a compact
+  vertical ellipsis marker that belongs to the same span.
+- Each span gets an interaction target at least `minHitLength` tall, spanning
+  the rail width. Where padded targets would overlap, split the shared space at
+  the midpoint between their positions so each point activates exactly one span.
+- Painted length never changes the span's transcript position or the viewport
+  frame.
 
-### Question tool
+### Colors
 
-- Follow the shared user-originated answer contract in PRD-023.
-- Keep the question request identifiable as a question tool.
-- Treat each completed answer as user-originated input in visual contexts. The
-  fact that the user supplied it is more important for presentation than the
-  fact that it travelled through a tool response.
-- In TimelineRail, project answer subspans from the parsed question-tool output.
-  Give them user-input lane, color, sizing, filtering, preview, and navigation
-  behavior while retaining their owning question `partId` and question/answer
-  index. Do not fabricate an SDK user-message identity.
-- A question request may remain tool-aligned and tool-identified. Its answer
-  subspans use the user-originated class and appear when the user-input toggle
-  is enabled, not when only tool/activity is enabled.
+- User input and system/control messages use distinct tonal variants; evaluate
+  in use and unify groups that read better the same.
+- Thinking and tool spans take their hue from the same semantic source as the
+  OCH-011 message-prefix labels: the shared tool-label classifier maps a tool to
+  its kind once, and the prefix and the span read the same theme token. No
+  separate tool-color map. Thinking uses `tools.label.thinking`; unknown tools
+  use the prefix fallback.
+- Theme tokens only; works in every theme, including Monozrakai (OCH-012).
 
-### Semantic colors shared with message prefixes
+### Viewport frame
 
-- Thinking, reasoning, and tool spans use the same semantic color source as the
-  corresponding message-prefix labels from PRD-011.
-- The shared tool-label classifier maps a tool to its semantic kind once. Both
-  the prefix and timeline span consume that result and the same theme token;
-  neither keeps a separate tool-color map.
-- Thinking spans use the same `tools.label.thinking` token as the Thinking or
-  Justification prefix.
-- Unknown tools use the same fallback as their prefix label.
-- Decorations may change opacity, outline, weight, or glow, but they retain the
-  span's semantic hue so a marked Read span still reads as Read.
-
-### Conversation decorations
-
-- Consume the PRD-022 `entryStates` channel for each projected span.
-  `TimelineRailView` does not receive direct Find props or own the registry.
-- Every span exposes `spanId`, `turnId`, `messageId`, optional `partId`, and its
-  intrinsic semantic kind to the decoration adapter.
-- Render `dimmed`, `highlighted`, `selected`, and `focused` states in a form
-  suitable for the narrow rail. Preserve the intrinsic tool, Thinking, and
-  user-input hue beneath the temporary treatment.
-- A disabled message-type toggle skips rendering its spans, including
-  decorations, without deleting or rewriting registry state.
-
-### Tokens per second in the title bar
-
-- Approximate input and output tokens-per-second for the current session appear
-  in the title bar, next to the used-tokens indicator
-  (`ContextUsageDisplay`, `packages/ui/src/components/layout/Header.tsx:1650`).
-- Values are derived from creation deltas and are **always labeled
-  approximate**; hidden when token data is unavailable.
-- See `DOCUMENTATION.md` for the derivation model.
+- A translucent outlined frame over the rail shows the portion of Chat currently
+  visible, like an editor minimap's viewport box.
+- Spans and frame share one normalized transcript coordinate model. Positions
+  come from the timeline/virtualizer geometry; the rail does not build its own
+  scroll model or measure mounted message DOM.
+- The frame follows scroll, resize, history prepend, and changed row
+  measurements, and the current Chat anchor stays put while history loads.
+- The load-earlier button stays visible while older history is not
+  materialized, so the frame never implies the loaded records are the whole
+  session.
+- The frame is presentation only and does not intercept hover, click, or
+  keyboard input.
 
 ### Navigation
 
-- Clicking a span scrolls the chat to that message (reusing the existing
-  on-select-turn jump).
-- Conversation Find publishes its result, hover, and selection states through
-  PRD-022. These decorations do not navigate Chat.
-- Later: clicking/selecting a range in the rail reflects in both the trajectory
-  ledger (PRD-002) and the chat.
+- Clicking a span jumps Chat to that span's message, instantly, as the current
+  rail does: a prompt through `navigation.scrollToTurnId`, every other span
+  through `navigation.scrollToMessageId`.
+- Hovering the rail shows a card for the nearest span: its kind (Prompt,
+  Reply, Thinking, System, or the tool name) and a preview of its text, after
+  the same rest delay the prompt rail used.
+- Keyboard: the toggle shortcut focuses the rail on the active turn. ArrowUp
+  and ArrowDown step by span, PageUp and PageDown by prompt, Home/End, Enter
+  jumps, Escape closes.
+- Load-earlier keeps the prompt rail's button and behavior.
+- Accessible name on the rail; each span is a listbox option labelled with its
+  kind and preview.
 
 ## Acceptance criteria
 
-- Each turn's user/agent/tool activity is distinguishable at a glance by
-  color + offset.
-- Compact top controls can isolate user-originated, agent, tool/activity, and
-  system/control spans without moving the viewport frame.
-- The rail-local length control switches between Content and Time immediately
-  and preserves the chosen mode across conversations.
-- Every span scales continuously with represented content size, clamps at the
-  shared cutoff, and marks content beyond that cutoff with a vertical ellipsis
-  in Content mode.
-- Time mode uses authoritative durations for non-user spans, content fallback
-  for missing timing, and context-scaled content lengths for user-originated
-  spans.
-- Empty and short spans remain visible and pointer-clickable through the shared
-  visual and hit-target minimums.
-- System/scope/control messages read differently from user-originated input.
-- Question requests remain identifiable as tools while completed answers read
-  and filter as user-originated input without losing question-tool identity.
-- Approx tps shows beside the tokens indicator when data exists, and is hidden
-  when it does not.
-- Clicking a span navigates the chat to that message.
-- A viewport frame tracks the visible Chat range against the same transcript
-  map used to place spans, including through resize and history prepend.
-- The rail follows PRD-019 ordering and width rules, and previews PRD-018 Find
-  results at the matching message or part span.
-- PRD-022 decoration states render at matching message, part, and span targets;
-  stale conversation layers never mark the current rail.
-- Tool and thinking span hues match their PRD-011 message-prefix hues while
-  decoration treatment remains visibly distinct.
-- The implementation is `TimelineRailView`, separate from
-  `PromptNavigatorRail`; the original rail remains independently usable.
+- With "Prompt navigator" on, Chat shows `TimelineRail` where the prompt rail
+  was; `PromptNavigatorRail.tsx` is unchanged and unmounted.
+- The upstream edit in `ChatContainer.tsx` is limited to the import and the
+  mount block, plus any geometry seam recorded in `FORK-DIFFERENCES.md`.
+- User, agent, and tool activity of each turn is distinguishable at a glance by
+  color and offset; system/control messages read differently from user input.
+- Span lengths scale continuously with content, clamp at 10,000 characters with
+  an ellipsis marker, and empty or short spans stay visible and clickable.
+- Tool and thinking span hues match their OCH-011 prefix hues in every theme.
+- The viewport frame tracks the visible Chat range through scroll, resize,
+  history prepend, and remeasurement.
+- Clicking a span lands Chat on that message; hover preview, keyboard
+  navigation, and load-earlier work as on the old rail.
 
 ## Validation
 
-- Projection tests for stable span, turn, message, and part identities.
-- Sizing tests for the logarithmic formula, empty content, the 10,000-character
-  cutoff, overflow marker, visual minimum, hit-target minimum, neighboring target
-  ownership, hidden-field exclusion, and all message classes.
-- Length-mode tests for control accessibility and persistence, authoritative
-  duration selection, invalid and missing timing fallback, live bounded updates,
-  user-anchor calculation and recalculation, and stable geometry and identity
-  while switching modes.
-- Profile mode switching and one-second live updates with the representative
-  300k-token fixture. Hidden and Content-mode rails perform no timer work, and a
-  live tick updates only affected spans rather than rescanning the conversation.
-- Projection tests for question-answer subspan identity and user-originated
-  classification without synthetic SDK messages.
-- Toggle tests for every class, user-only mode, hidden hit targets, reset and
-  auto-hide lifecycle, decoration retention, and accessible operation.
-- PRD-022 integration tests for target specificity, lifecycle transitions, and
-  conversation-scope clearing.
-- Geometry tests for viewport position and size, resize, history prepend,
-  incomplete-history boundaries, and changed virtualizer measurements.
-- Integration tests proving Find can mark message and part spans without
-  navigation and without feature-specific rail props.
-- Theme tests proving tool and thinking prefixes and rail spans resolve the same
-  semantic tokens, including unknown-tool fallback.
+- Projection tests: stable span, turn, message, and part identities; lane and
+  kind classification for user, agent, reasoning, tool, and system/control.
+- Sizing tests: the log formula, empty content, the 10,000-character cutoff and
+  marker, visual minimum, hit-target minimum, neighbor target ownership, and
+  hidden-field exclusion.
+- Geometry tests: frame position and size, resize, history prepend, incomplete
+  history, changed measurements.
+- Theme test: tool and thinking prefixes and spans resolve the same tokens,
+  including the unknown-tool fallback.
+- Profile with the representative 300k-token fixture: scrolling and streaming
+  must not rescan the whole conversation per frame.
 
-## Out of scope / future
+## Decisions taken during implementation
 
-- The full trajectory ledger view (PRD-002).
-- Bidirectional navigation sync across rail/ledger/chat (PRD-002, later).
-- Live streaming tps (measured client-side from part deltas) — a separate
-  feature, also latency-inclusive.
-- Any change to the prompt navigator's existing hover preview or keyboard
-  navigation unless it conflicts with the lane or viewport layout.
+- **Geometry source.** `MessageListHandle.getTimelineLayout()` returns the
+  list's rows (`TimelineEntry[]`) and LegendList state. Row tops come from
+  `positionAtIndex`; a row's size is the next row's position minus its own,
+  so rows placed from estimates count too. The extent and the frame come from
+  the scroll node. The rail subscribes to `lastPositionUpdate` and `totalSize`.
+- **Positions inside a row.** A row is split between its spans by an estimated
+  rendered height: text by line count, tool rows, reasoning blocks and notices
+  by a fixed header height.
+- **Length vs. position.** Spans paint in transcript order, later on top. The
+  whole gutter is one pointer target: the nearest span within 8 px wins, later
+  spans win ties, gaps split at the midpoint.
+- **Long empty stretches** (a long answer, the list's tail spacer) are cut to
+  a short gap and the scale grows until the spans fill the rail. The frame
+  maps through the same anchors. A line marking each cut was tried and
+  dropped. (UAT 2026-10-21: the holes read as time gaps.)
+- **Pointer lookup weighs the lane**, so pointing at a prompt no longer picks
+  the tool call level with it. The rail keeps the normal arrow pointer; a
+  crosshair hid the spans it pointed at. (UAT 2026-10-21.)
+- **Units are rem**, snapped to device pixels, so the rail follows the
+  interface size setting like the rest of the UI. (UAT 2026-10-21.)
+- **Hover** outlines the hovered span and dims the others.
+- **Non-prompt clicks** release live follow and ask the list for the message:
+  the controller's message index skips v2 replies (no `parentID`), which
+  `windowTurns.test.ts` pins. Whether that upstream rule is stale is open; see
+  Comments. (UAT 2026-10-21: only prompt clicks moved Chat.)
+- Starting values, to tune in UAT, at the default 16 px root: span width
+  0.3125rem (5 px), lane gap 0.09375rem (1.5 px, three device pixels on a
+  2x screen), span length 0.1875rem to 1.75rem, hit reach 0.5rem, lane
+  penalty 0.375rem, cut gap 0.4375rem.
+
+## Later iterations
+
+Kept from the earlier version of this ticket; each becomes its own ticket or
+iteration once v1 lands.
+
+- **Message-type toggles.** Tiny square/dot toggles at the top of the rail, one
+  per class (user input, agent output, tool/activity, system/control), all on
+  initially; user-only gives the old prompt-rail view. A disabled class has no
+  spans or hit targets, keeps its decoration state, and does not move the frame.
+  Temporary view state: survives responsive auto-hide, resets when the rail
+  closes or the conversation changes. Keyboard reachable, accessible name,
+  pressed state, tooltip, not color alone.
+- **Content/Time length mode.** A two-state control beside the toggles using the
+  shared sprite `Icon` (content-size or clock), translated state name and
+  tooltip, persisted across conversations. Time mode sizes non-user spans by
+  authoritative duration on a log scale with a five-minute cutoff, falls back to
+  content for missing or invalid timing, never infers duration from neighbors or
+  busy events, grows live spans at most once per second, and does no timer work
+  when hidden or in Content mode. User-originated spans stay content-sized,
+  anchored to the median of completed timed spans (midpoint when none) per
+  `custom-dev/DOCUMENTATION.md`, recalculated only when the history boundary
+  changes. Switching modes changes painted length only.
+- **OCH-023 question answers.** Answer subspans from parsed question-tool output
+  with user-input lane, color, sizing, filtering, preview, and navigation,
+  keeping the owning `partId` and question/answer index, no synthetic SDK user
+  message. The request stays tool-identified.
+- **OCH-022 decorations.** Consume `entryStates` per span; render `dimmed`,
+  `highlighted`, `selected`, `focused` for the narrow rail over the intrinsic
+  hue. The rail does not own the registry or take Find props.
+- **OCH-018 Find.** Find results preview at matching message or part spans
+  through OCH-022, without navigating Chat.
+- **OCH-019 placement.** Move the rail into the workspace stack as a stackable
+  view with user-ordered side and position and the shared width rules.
+- **OCH-002.** Range selection in the rail reflected in the trajectory ledger
+  and Chat.
+
+Dropped: approximate tokens-per-second in the title bar.
+
+## Comments
+
+### 2026-10-20 19:09 · Claude
+
+Refined with Oscar. Decisions: replace `PromptNavigatorRail` at its single mount
+point with a fork-owned `TimelineRail`, with no legacy selector; keep the existing
+setting and shortcut; stay an in-place overlay, with OCH-019 placement deferred;
+v1 is lanes, content-sized spans, colors, and the viewport frame. Toggles, Time
+mode, OCH-018/022/023 integration moved to later iterations; question tools
+render as plain tool spans for now; tokens/s dropped.
+
+### 2026-10-20 19:17 · oscar
+
+Set status=in-progress; estimated_effort=3.
+
+### 2026-10-20 19:40 · oscar
+
+Set status=review.
+
+### 2026-10-21 06:28 · oscar
+
+UAT round 1 found three issues, fixed: duplicate React key left the previous transcript mounted on session switch; lanes overlapped (now 1 px apart); empty stretches, imprecise pointer, and non-prompt clicks (see Decisions). Open question for Oscar: windowTurns.ts refuses v2 reply ids because it maps them through parentID, and windowTurns.test.ts pins that. It looks like a v1 leftover that also breaks #message-<id> links to replies; fixing it upstream-side is a separate decision.
+
+### 2026-10-21 09:00 · oscar
+
+Pre-commit review fixed: wheel over the rail scrolls Chat; a pointer no longer focuses the rail; clicks in a folded turn unfold it (Thinking spans also open the reasoning block); reasoning spans follow Show reasoning traces; memoized spans, so hover re-renders two; StrictMode no longer leaves the rail empty; stale list positions cannot reorder spans; header offset 3rem; frame height is no longer reset by React; shortcut before the first layout; aria-current on the active turn.

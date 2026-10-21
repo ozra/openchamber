@@ -6,6 +6,7 @@ import { contrastRatio, withOpacity, mixColor } from './color';
 import { getMarkdownSyntaxVars } from '../../components/chat/markdown/markdownSyntaxVars';
 import { buildSyntaxTokenRules } from '../shiki/textMateThemeFromAppTheme';
 import { buildVSCodeThemeFromPalette } from './vscode/adapter';
+import { getToolLabelColorVar } from '../toolHelpers';
 
 const minimal = {
   metadata: { id: 'minimal', name: 'Minimal', variant: 'dark' as const },
@@ -31,6 +32,9 @@ describe('compact theme definitions', () => {
     const css = new CSSVariableGenerator().generate(resolved);
     expect(css).toContain('--tools-label-shell: #F92672;');
     expect(css).toContain('--tools-label-thinking: #C8986A;');
+    // A tool the theme does not name (remote_bash, openchamber_web) takes the default.
+    expect(css).toContain('--tools-label-default: #E6DB74;');
+    expect(getToolLabelColorVar('opencode.remote_bash')).toBe('var(--tools-label-remote-bash, var(--tools-label-default, var(--tools-title)))');
   });
 
   test('resolves a complete rendering palette from the authored roles', () => {

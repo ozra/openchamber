@@ -178,7 +178,8 @@
         "subagent": "#AE81FF",
         "skill": "#AE81FF",
         "question": "#AE81FF",
-        "thinking": "#C8986A"
+        "thinking": "#C8986A",
+        "default": "#E6DB74"
       }
     }
   },

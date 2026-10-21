@@ -60,7 +60,9 @@ import {
 } from '@/components/chat/composer/state/composerInsetReaders';
 import { SessionErrorNotice } from '@/components/chat/SessionErrorNotice';
 import ScrollToBottomButton from './components/ScrollToBottomButton';
-import { PromptNavigatorRail } from './components/PromptNavigatorRail';
+// Fork (OCH-001): the timeline rail replaces PromptNavigatorRail.
+import { TimelineRail, type TimelineRailMessageTarget } from './components/timelineRail/TimelineRail';
+import { requestReasoningReveal } from './search/reasoningReveal';
 import { useAuthSessionStore } from '@/lib/runtime-auth-expiry';
 import { useScrollShadow } from '@/components/ui/useScrollShadow';
 import { useChatTimelineScroll, type LinkedMessageState, type TimelineListHandle } from '@/hooks/useChatTimelineScroll';
@@ -244,6 +246,7 @@ type ChatViewportProps = {
     turnIds: string[];
     activeTurnId: string | null;
     onSelectTurn: (turnId: string) => void;
+    onSelectMessage: (target: TimelineRailMessageTarget) => void;
     showPromptNavigator: boolean;
     canLoadEarlierPrompts: boolean;
     isLoadingOlderPrompts: boolean;
@@ -281,6 +284,7 @@ const ChatViewport = React.memo(({
     turnIds,
     activeTurnId,
     onSelectTurn,
+    onSelectMessage,
     showPromptNavigator,
     canLoadEarlierPrompts,
     isLoadingOlderPrompts,
@@ -585,11 +589,17 @@ const ChatViewport = React.memo(({
                 />
                 <OverlayScrollbar containerRef={scrollRef} disableHorizontal suppressVisibility={isProgrammaticFollowActive} userIntentOnly observeMutations={false} onThumbDragStart={onScrollbarDrag} />
                 {showPromptNavigator && promptTurnIds.length >= 2 ? (
-                    <PromptNavigatorRail
-                        turnIds={promptTurnIds}
-                        previewsByTurnId={promptPreviewsByTurnId}
+                    <TimelineRail
+                        // Not the bare session key: MessageList is a sibling
+                        // keyed by it, and duplicate sibling keys leave the
+                        // previous transcript mounted on a switch.
+                        key={`timeline-rail:${currentSessionKey}`}
+                        listRef={messageListRef}
+                        scrollRef={scrollRef}
+                        messages={renderedMessages}
                         activeTurnId={railActiveTurnId}
                         onSelectTurn={onSelectTurn}
+                        onSelectMessage={onSelectMessage}
                         canLoadEarlier={canLoadEarlierPrompts}
                         isLoadingOlder={isLoadingOlderPrompts}
                         onLoadEarlier={onLoadEarlierPrompts}
@@ -626,6 +636,7 @@ const ChatViewport = React.memo(({
         && prev.turnIds === next.turnIds
         && prev.activeTurnId === next.activeTurnId
         && prev.onSelectTurn === next.onSelectTurn
+        && prev.onSelectMessage === next.onSelectMessage
         && prev.showPromptNavigator === next.showPromptNavigator
         && prev.canLoadEarlierPrompts === next.canLoadEarlierPrompts
         && prev.isLoadingOlderPrompts === next.isLoadingOlderPrompts
@@ -1440,6 +1451,22 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         // wrong message; a teleport always arrives.
         void navigation.scrollToTurnId(turnId, { behavior: 'auto' });
     }, [navigation]);
+    // Fork (OCH-001). The controller cannot place replies by message id (its
+    // turn index maps them through `parentID`, which v2 replies lack), so the
+    // rail releases live follow itself and asks the list, which knows every
+    // rendered message; the turn jump covers a message the list cannot reach.
+    // A span in a folded turn unfolds it first, and a Thinking span also opens
+    // its reasoning block, as a search hit does; the list's settle loop lands
+    // on the message once it mounts.
+    const handleTimelineRailSelectMessage = React.useCallback(({ turnId, messageId, reasoning }: TimelineRailMessageTarget) => {
+        requestReasoningReveal(reasoning ? messageId : null);
+        const list = messageListRef.current;
+        list?.revealFoldedMessage(messageId);
+        onManualNavigation();
+        if (list?.scrollToMessageId(messageId, { behavior: 'auto' })) return;
+        if (turnId) void navigation.scrollToTurnId(turnId, { behavior: 'auto' });
+        else void navigation.scrollToMessageId(messageId, { behavior: 'auto' });
+    }, [navigation, onManualNavigation]);
     const canLoadEarlierPrompts = timelineController.historySignals.canLoadEarlier;
     const promptRailEnabled = !isMobile
         && !isDesktopExpandedInput
@@ -1800,6 +1827,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                 turnIds={timelineController.turnIds}
                 activeTurnId={timelineController.activeTurnId}
                 onSelectTurn={handlePromptNavigatorSelect}
+                onSelectMessage={handleTimelineRailSelectMessage}
                 showPromptNavigator={showPromptNavigator}
                 canLoadEarlierPrompts={canLoadEarlierPrompts}
                 isLoadingOlderPrompts={timelineController.isLoadingOlder}
