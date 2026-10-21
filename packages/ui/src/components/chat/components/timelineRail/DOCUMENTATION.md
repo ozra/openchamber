@@ -6,6 +6,7 @@ Fork-owned (OCH-001). The rail on the chat's end edge: one span per prompt, repl
 
 - `projectRailSpans.ts` turns the list's rows into spans: kind, lane, content size, stable ids, preview text.
 - `layoutRailSpans.ts` owns the span-length formula, the placement of spans on the rail, and the pointer lookup.
+- `layoutConversationMap.ts` picks the conversation map's boxes (OCH-044): every prompt and reply, thinned where they would overlap, with dots for the ones left out. `ConversationMap.tsx` paints them.
 - `TimelineRail.tsx` reads the list, subscribes to its position updates, paints spans and the frame, and handles hover, click, keyboard and load-earlier.
 
 The rail owns no transcript data. Rows and their positions come from `MessageList` through `MessageListHandle.getTimelineLayout()`. A prompt jumps through the timeline controller (`onSelectTurn`); every other span through `onSelectMessage` in `ChatContainer`, which unfolds the message's turn (`MessageListHandle.revealFoldedMessage`, plus `requestReasoningReveal` for a Thinking span), releases live follow and asks the list for the message (see the decision below). Reasoning spans follow the "Show reasoning traces" setting, as Chat does. The setting (`promptNavigatorEnabled`), the toggle shortcut and `isPromptNavigatorPanelOpen` are the prompt rail's and are reused unchanged.
@@ -24,9 +25,12 @@ The rail owns no transcript data. Rows and their positions come from `MessageLis
 - Prompts and replies paint in the text color; system records in `--timeline-rail-system` (`colors.timelineRail.system`, otherwise `#00FFFF` dark and `#0097A7` light), opaque at rest.
 - A span that runs into the next span of its lane shrinks by at most 30% and never below its width; the minimum length is the span width.
 - The rail runs the chat's full height; the composer pads its end edge by the rail's room (`[data-prompt-rail]`, typography.css), at least `12px + 1.25rem`, so it never covers the rail at any interface size.
+- A failed tool call keeps its tool color and gets a dot in `--status-error` beside its span on the end side, opaque at rest, so the kind of call that failed stays readable.
 - Tool and thinking spans are lifted to at least the theme's `--timeline-rail-min-lightness` (OKLCH; `config.timelineRail.minLightness`, otherwise 0 on dark themes and 0.62 on light ones). Prompts and replies stay ink. Engines without relative color syntax paint the plain color.
 - Moving the highlight re-renders only the spans it moves between (`RailSpanMark` is memoized; the ring and the dimming are CSS on `aria-selected` and `data-dimmed`).
 - Span content positions never go back, even when the list reports a stale row position.
+- The conversation map shows exactly while the hover card does, from the pointer or keyboard navigation, and paints below it. It takes no pointer events, so hover, click and wheel stay with the rail and the map closes when the pointer leaves the rail. It renders from the placed spans alone, memoized, so moving the highlight does not re-render it.
+- Map boxes never overlap: prompts are placed first, then each turn's last reply, then the other replies, earlier before later within each group, and a box that collides becomes a dot at its span's position. Prompt boxes sit 2.5rem farther from the rail than reply boxes, both edges, so the map alternates sides like a chat; prompt dots sit farther out than reply dots, as the prompt lane does on the rail.
 
 ## Decisions
 
@@ -69,3 +73,7 @@ LegendList's row positions start below the list header, and `getState()` does no
 ### Why the rail forwards the wheel
 
 The rail sits beside the scroller, not inside it, so a wheel over its full-height track scrolled nothing. The track re-dispatches the wheel event on the scroller first, so the timeline hook's wheel listener releases live follow as for a real wheel, then scrolls it by the event's delta.
+
+### Why the map thins boxes out instead of spreading them
+
+Prompts on a long rail sit closer together than one line of text. Pushing boxes apart with leader lines back to their spans was considered; it moves a box away from the part of the rail it describes. Leaving the colliding box out keeps every box at its span, and the dot it leaves says something was skipped there.

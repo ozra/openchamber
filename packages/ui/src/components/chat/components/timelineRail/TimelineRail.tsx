@@ -9,6 +9,8 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useChatColumnActions } from '../../chatColumnSession';
 import type { ChatMessageEntry } from '../../lib/turns/types';
 import type { MessageListHandle, MessageListTimelineLayout } from '../../MessageList';
+import { ConversationMap } from './ConversationMap';
+import { resolveConversationMapMetrics } from './layoutConversationMap';
 import {
     findRailSpanAt,
     layoutRailSpans,
@@ -79,8 +81,9 @@ const KIND_LABEL_KEYS = {
 /**
  * Fill of a span. Prompts and replies are the conversation, in the text
  * color the chat shows them in; tool and thinking spans take the theme tokens
- * of their message-prefix labels (OCH-011); system records take the rail's
- * loud system color.
+ * of their message-prefix labels (OCH-011), a failed call too, so its kind
+ * still shows (the failure is a dot beside it); system records take the
+ * rail's loud system color.
  */
 const spanColor = (span: RailSpan): string => {
     switch (span.kind) {
@@ -90,7 +93,7 @@ const spanColor = (span: RailSpan): string => {
         case 'reasoning':
             return 'var(--tools-label-thinking, var(--tools-title))';
         case 'tool':
-            return span.toolFailed ? 'var(--status-error)' : getToolLabelColorVar(span.toolName ?? '');
+            return getToolLabelColorVar(span.toolName ?? '');
         case 'system':
             return 'var(--timeline-rail-system)';
     }
@@ -162,6 +165,19 @@ const overflowMarkerStyle = (placed: PlacedRailSpan, metrics: RailMetrics): Span
         width: dot,
         backgroundImage: `radial-gradient(circle, ${SPAN_PAINT} 45%, transparent 55%)`,
         backgroundSize: `${dot}px ${dot * 1.5}px`,
+    };
+};
+
+// A failed tool call gets a dot in the error color beside its span, on the
+// end side, at the span's middle.
+const failedMarkerStyle = (placed: PlacedRailSpan, metrics: RailMetrics): React.CSSProperties => {
+    const dot = Math.max(metrics.laneGap * 2, metrics.spanWidth * 0.6);
+    return {
+        top: placed.top + (placed.length - dot) / 2,
+        height: dot,
+        insetInlineStart: laneOffset(metrics, laneOfKind(placed.span.kind)) + metrics.spanWidth + metrics.laneGap,
+        width: dot,
+        background: 'var(--status-error)',
     };
 };
 
@@ -238,6 +254,7 @@ type RailSpanMarkProps = {
     /** System records stay opaque at rest: they are rare and meant to be seen. */
     loud: boolean;
     overflowStyle: SpanStyle | undefined;
+    failedStyle: React.CSSProperties | undefined;
     selected: boolean;
     current: boolean;
 };
@@ -249,7 +266,7 @@ type RailSpanMarkProps = {
 // `--timeline-rail-rest-opacity` (1 dark, 0.55 light by default), so
 // overlapping spans build up intensity; the dimmed ones keep the same ratio
 // to it as before (0.4 against 0.85).
-const RailSpanMark = React.memo(function RailSpanMark({ id, label, style, lifted, loud, overflowStyle, selected, current }: RailSpanMarkProps) {
+const RailSpanMark = React.memo(function RailSpanMark({ id, label, style, lifted, loud, overflowStyle, failedStyle, selected, current }: RailSpanMarkProps) {
     return (
         <>
             <div
@@ -277,6 +294,14 @@ const RailSpanMark = React.memo(function RailSpanMark({ id, label, style, lifted
                         lifted && LIFT_CLASS,
                     )}
                     style={overflowStyle}
+                />
+            ) : null}
+            {/* Opaque at rest, like system records: a failure is meant to be seen. */}
+            {failedStyle ? (
+                <div
+                    aria-hidden="true"
+                    className="absolute rounded-full opacity-100 transition-opacity duration-150 group-data-[dimmed=true]/lanes:opacity-47"
+                    style={failedStyle}
                 />
             ) : null}
         </>
@@ -315,6 +340,8 @@ export function TimelineRail({
     const [metrics, setMetrics] = React.useState(readMetrics);
     const metricsRef = React.useRef(metrics);
     metricsRef.current = metrics;
+    const [mapMetrics, setMapMetrics] = React.useState(() => resolveConversationMapMetrics(readRootFontPx()));
+    const [railHeight, setRailHeight] = React.useState(0);
     const toRailRef = React.useRef<RailLayout['toRail'] | null>(null);
     const [highlightedIndex, setHighlightedIndex] = React.useState<number | null>(null);
     const highlightedIndexRef = React.useRef(highlightedIndex);
@@ -372,6 +399,7 @@ export function TimelineRail({
         if (!isSameMetrics(metricsRef.current, nextMetrics)) {
             metricsRef.current = nextMetrics;
             setMetrics(nextMetrics);
+            setMapMetrics(resolveConversationMapMetrics(readRootFontPx()));
         }
         const { placed: next, toRail } = layoutRailSpans({
             spans: projectRailSpans(layout.entries, showReasoningTracesRef.current),
@@ -381,6 +409,7 @@ export function TimelineRail({
             metrics: metricsRef.current,
         });
         toRailRef.current = toRail;
+        setRailHeight(track.clientHeight);
         if (!isSamePlacement(placedRef.current, next)) {
             // The highlight follows its span when spans before it come or go.
             const current = highlightedIndexRef.current;
@@ -679,6 +708,7 @@ export function TimelineRail({
         lifted: isLiftedKind(entry.span.kind),
         loud: entry.span.kind === 'system',
         overflowStyle: entry.overflows ? overflowMarkerStyle(entry, metrics) : undefined,
+        failedStyle: entry.span.toolFailed ? failedMarkerStyle(entry, metrics) : undefined,
     })), [emptyPreviewLabel, kindLabel, metrics, optionId, placed, t]);
     const lanesStyle = React.useMemo<React.CSSProperties & Record<'--rail-ring', string>>(() => ({
         width: lanesWidth(metrics),
@@ -749,6 +779,7 @@ export function TimelineRail({
                             lifted={mark.lifted}
                             loud={mark.loud}
                             overflowStyle={mark.overflowStyle}
+                            failedStyle={mark.failedStyle}
                             selected={index === highlightedIndex}
                             current={index === activeIndex}
                         />
@@ -767,6 +798,15 @@ export function TimelineRail({
                         width: lanesWidth(metrics) + metrics.laneGap * 2,
                     }}
                 />
+                {/* Shown with the card, which paints above it (z-30). */}
+                {highlighted ? (
+                    <ConversationMap
+                        placed={placed}
+                        railHeight={railHeight}
+                        metrics={mapMetrics}
+                        emptyPreviewLabel={emptyPreviewLabel}
+                    />
+                ) : null}
                 {highlighted ? (
                     <div
                         aria-hidden="true"

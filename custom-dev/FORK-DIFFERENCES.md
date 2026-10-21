@@ -140,7 +140,10 @@ folder:
 
 - `ChatContainer.tsx`: the imports, the mount block in `ChatViewport`, and an
   `onSelectMessage` prop (type, destructure, memo comparator, the
-  `handleTimelineRailSelectMessage` callback, call site).
+  `handleTimelineRailSelectMessage` callback, call site). The rail shows from
+  the first prompt: upstream's prompt rail waits for two (`>= 2` in
+  `showPromptNavigator` and the mount block), changed to `> 0` by Oscar's
+  decision on 2026-10-21.
 - `MessageList.tsx`: `MessageListHandle.getTimelineLayout()` and the
   `MessageListTimelineLayout` type, plus `allEntriesRef` behind it, and
   `MessageListHandle.revealFoldedMessage` (the list's existing function).

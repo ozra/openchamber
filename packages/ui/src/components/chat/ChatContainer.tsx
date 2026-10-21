@@ -588,7 +588,7 @@ const ChatViewport = React.memo(({
                     style={endFadeStyle}
                 />
                 <OverlayScrollbar containerRef={scrollRef} disableHorizontal suppressVisibility={isProgrammaticFollowActive} userIntentOnly observeMutations={false} onThumbDragStart={onScrollbarDrag} />
-                {showPromptNavigator && promptTurnIds.length >= 2 ? (
+                {showPromptNavigator && promptTurnIds.length > 0 ? (
                     <TimelineRail
                         // Not the bare session key: MessageList is a sibling
                         // keyed by it, and duplicate sibling keys leave the
@@ -1472,7 +1472,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         && !isDesktopExpandedInput
         && promptNavigatorEnabled;
     const showPromptNavigator = promptRailEnabled
-        && timelineController.turnIds.length >= 2;
+        && timelineController.turnIds.length > 0;
 
     React.useEffect(() => {
         if (!showPromptNavigator && !pinned) {
