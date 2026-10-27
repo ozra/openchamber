@@ -60,7 +60,8 @@ import {
 } from '@/components/chat/composer/state/composerInsetReaders';
 import { SessionErrorNotice } from '@/components/chat/SessionErrorNotice';
 import ScrollToBottomButton from './components/ScrollToBottomButton';
-// Fork (OCH-001): the timeline rail replaces PromptNavigatorRail.
+import { PromptNavigatorRail } from './components/PromptNavigatorRail';
+// Fork (OCH-001, OCH-047): the timeline rail, or the prompt navigator by setting.
 import { TimelineRail, type TimelineRailMessageTarget } from './components/timelineRail/TimelineRail';
 import { requestReasoningReveal } from './search/reasoningReveal';
 import { useAuthSessionStore } from '@/lib/runtime-auth-expiry';
@@ -291,6 +292,7 @@ const ChatViewport = React.memo(({
     onLoadEarlierPrompts,
 }: ChatViewportProps) => {
     const { t } = useI18n();
+    const chatRailKind = useUIStore((state) => state.chatRailKind);
     const promptPreviewsByTurnIdRef = React.useRef<Map<string, Part[]>>(new Map());
     // Cache normalized parts per source array so unchanged messages keep the
     // same reference and the memo below can bail out to the previous map.
@@ -588,7 +590,21 @@ const ChatViewport = React.memo(({
                     style={endFadeStyle}
                 />
                 <OverlayScrollbar containerRef={scrollRef} disableHorizontal suppressVisibility={isProgrammaticFollowActive} userIntentOnly observeMutations={false} onThumbDragStart={onScrollbarDrag} />
-                {showPromptNavigator && promptTurnIds.length > 0 ? (
+                {/* Fork (OCH-047): one rail at a time. The prompt navigator
+                    keeps upstream's two-prompt minimum; the timeline rail
+                    shows from the first prompt (OCH-044). */}
+                {showPromptNavigator && chatRailKind === 'prompt' && promptTurnIds.length >= 2 ? (
+                    <PromptNavigatorRail
+                        turnIds={promptTurnIds}
+                        previewsByTurnId={promptPreviewsByTurnId}
+                        activeTurnId={railActiveTurnId}
+                        onSelectTurn={onSelectTurn}
+                        canLoadEarlier={canLoadEarlierPrompts}
+                        isLoadingOlder={isLoadingOlderPrompts}
+                        onLoadEarlier={onLoadEarlierPrompts}
+                    />
+                ) : null}
+                {showPromptNavigator && chatRailKind === 'timeline' && promptTurnIds.length > 0 ? (
                     <TimelineRail
                         // Not the bare session key: MessageList is a sibling
                         // keyed by it, and duplicate sibling keys leave the

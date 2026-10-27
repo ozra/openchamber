@@ -96,6 +96,8 @@ export const createSettingsHelpers = (dependencies) => {
   const UI_LOCALE_VALUES = new Set(['en', 'de', 'fr', 'nl', 'zh-CN', 'zh-TW', 'uk', 'es', 'pt-BR', 'ko', 'pl', 'ja', 'tr', 'ar', 'he']);
   const SIDEBAR_PROJECT_SORT_ORDER_VALUES = new Set(['manual', 'a-z', 'z-a', 'date-added', 'recent']);
   const SIDEBAR_WORKTREE_SORT_ORDER_VALUES = new Set(['recent', 'manual', 'a-z']);
+  const CONVERSATION_MAP_VISIBILITY_VALUES = new Set(['always', 'whenRoom', 'off']);
+  const CHAT_RAIL_KIND_VALUES = new Set(['timeline', 'prompt']);
   const HIDDEN_MODELS_MAX = 1024;
   const RECENT_EFFORTS_MAX_KEYS = 128;
   const RECENT_EFFORTS_MAX_VARIANTS_PER_KEY = 5;
@@ -934,6 +936,12 @@ export const createSettingsHelpers = (dependencies) => {
       if (mode === 'summary' || mode === 'formatted' || mode === 'raw') {
         result.toolJsonViewMode = mode;
       }
+    }
+    if (CONVERSATION_MAP_VISIBILITY_VALUES.has(candidate.conversationMapVisibility)) {
+      result.conversationMapVisibility = candidate.conversationMapVisibility;
+    }
+    if (CHAT_RAIL_KIND_VALUES.has(candidate.chatRailKind)) {
+      result.chatRailKind = candidate.chatRailKind;
     }
     if (typeof candidate.directoryShowHidden === 'boolean') {
       result.directoryShowHidden = candidate.directoryShowHidden;

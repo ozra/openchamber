@@ -39,6 +39,11 @@ import {
   type MovedZoneViews,
 } from '@/lib/workspace/zones';
 import { sanitizeWorkStatusSectionOrder, type WorkStatusPanelSectionId } from '@/components/chat/work-status/sections';
+import {
+  CONVERSATION_MAP_VISIBILITIES,
+  type ConversationMapVisibility,
+} from '@/components/chat/components/timelineRail/conversationMapVisibility';
+import { CHAT_RAIL_KINDS, type ChatRailKind } from '@/components/chat/components/timelineRail/chatRailKind';
 
 export type PendingDiffScope = 'working' | 'staged' | 'turn' | 'branch' | 'commit' | 'pr';
 export type { ContextPanelMode };
@@ -1157,6 +1162,10 @@ interface UIStore {
   collapsibleUserMessages: boolean;
   stickyUserHeader: boolean;
   promptNavigatorEnabled: boolean;
+  /** When the timeline rail's conversation map shows its boxes (OCH-046). */
+  conversationMapVisibility: ConversationMapVisibility;
+  /** Which rail shows while `promptNavigatorEnabled` is on (OCH-047). */
+  chatRailKind: ChatRailKind;
   showSplitAssistantMessageActions: boolean;
   allowPromptingSubagentSessions: boolean;
   savePastedImagesAsFiles: boolean;
@@ -1420,6 +1429,8 @@ interface UIStore {
   setCollapsibleUserMessages: (value: boolean) => void;
   setStickyUserHeader: (value: boolean) => void;
   setPromptNavigatorEnabled: (value: boolean) => void;
+  setConversationMapVisibility: (value: ConversationMapVisibility) => void;
+  setChatRailKind: (value: ChatRailKind) => void;
   setShowSplitAssistantMessageActions: (value: boolean) => void;
   setAllowPromptingSubagentSessions: (value: boolean) => void;
   setSavePastedImagesAsFiles: (value: boolean) => void;
@@ -1655,6 +1666,8 @@ export const useUIStore = create<UIStore>()(
         collapsibleUserMessages: true,
         stickyUserHeader: false,
         promptNavigatorEnabled: true,
+        conversationMapVisibility: 'always',
+        chatRailKind: 'timeline',
         showSplitAssistantMessageActions: false,
         allowPromptingSubagentSessions: false,
         savePastedImagesAsFiles: false,
@@ -3344,6 +3357,12 @@ export const useUIStore = create<UIStore>()(
         setPromptNavigatorEnabled: (value) => {
           set({ promptNavigatorEnabled: value });
         },
+        setConversationMapVisibility: (value) => {
+          set({ conversationMapVisibility: value });
+        },
+        setChatRailKind: (value) => {
+          set({ chatRailKind: value });
+        },
         setShowSplitAssistantMessageActions: (value) => {
           set({ showSplitAssistantMessageActions: value });
         },
@@ -3640,6 +3659,12 @@ export const useUIStore = create<UIStore>()(
             && state.toolJsonViewMode !== 'raw') {
             state.toolJsonViewMode = 'summary';
           }
+          if (!CONVERSATION_MAP_VISIBILITIES.some((value) => value === state.conversationMapVisibility)) {
+            state.conversationMapVisibility = 'always';
+          }
+          if (!CHAT_RAIL_KINDS.some((value) => value === state.chatRailKind)) {
+            state.chatRailKind = 'timeline';
+          }
 
           if (typeof state.autoSaveEnabled !== 'boolean') {
             state.autoSaveEnabled = true;
@@ -3802,6 +3827,8 @@ export const useUIStore = create<UIStore>()(
           collapsibleUserMessages: state.collapsibleUserMessages,
           stickyUserHeader: state.stickyUserHeader,
           promptNavigatorEnabled: state.promptNavigatorEnabled,
+          conversationMapVisibility: state.conversationMapVisibility,
+          chatRailKind: state.chatRailKind,
           showSplitAssistantMessageActions: state.showSplitAssistantMessageActions,
           allowPromptingSubagentSessions: state.allowPromptingSubagentSessions,
           savePastedImagesAsFiles: state.savePastedImagesAsFiles,

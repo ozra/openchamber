@@ -30,6 +30,8 @@ import { useInputHistoryStore } from '@/stores/useInputHistoryStore';
 import { useMessageQueueStore, type FollowUpBehavior } from '@/stores/messageQueueStore';
 import { selectSafetyNetAvailable, useRoutingStore } from '@/stores/useRoutingStore';
 import { useUIStore, type LargeTextPasteBehavior } from '@/stores/useUIStore';
+import type { ConversationMapVisibility } from '@/components/chat/components/timelineRail/conversationMapVisibility';
+import type { ChatRailKind } from '@/components/chat/components/timelineRail/chatRailKind';
 
 import { MessageSearchSettings } from './MessageSearchSettings';
 import { SessionGoalCheckerField, SessionGoalMaxTurnsField } from './SessionGoalCheckerField';
@@ -61,6 +63,18 @@ const DIFF_LAYOUT_OPTIONS: ChipOption<'dynamic' | 'inline' | 'side-by-side'>[] =
 const FOLLOW_UP_BEHAVIOR_OPTIONS: ChipOption<FollowUpBehavior>[] = [
   { id: 'steer', labelKey: 'settings.openchamber.visual.option.followUpBehavior.steer.label' },
   { id: 'queue', labelKey: 'settings.openchamber.visual.option.followUpBehavior.queue.label' },
+];
+
+const CHAT_RAIL_OPTIONS: ChipOption<ChatRailKind | 'off'>[] = [
+  { id: 'timeline', labelKey: 'settings.openchamber.visual.option.chatRail.timeline.label' },
+  { id: 'prompt', labelKey: 'settings.openchamber.visual.option.chatRail.prompt.label' },
+  { id: 'off', labelKey: 'settings.openchamber.visual.option.chatRail.off.label' },
+];
+
+const CONVERSATION_MAP_VISIBILITY_OPTIONS: ChipOption<ConversationMapVisibility>[] = [
+  { id: 'always', labelKey: 'settings.openchamber.visual.option.conversationMapVisibility.always.label' },
+  { id: 'whenRoom', labelKey: 'settings.openchamber.visual.option.conversationMapVisibility.whenRoom.label' },
+  { id: 'off', labelKey: 'settings.openchamber.visual.option.conversationMapVisibility.off.label' },
 ];
 
 const INPUT_HISTORY_SCOPE_OPTIONS: ChipOption<InputHistoryScope>[] = [
@@ -105,6 +119,10 @@ const MessagesTab: React.FC = () => {
   const setWideChatLayoutEnabled = useUIStore((state) => state.setWideChatLayoutEnabled);
   const promptNavigatorEnabled = useUIStore((state) => state.promptNavigatorEnabled);
   const setPromptNavigatorEnabled = useUIStore((state) => state.setPromptNavigatorEnabled);
+  const chatRailKind = useUIStore((state) => state.chatRailKind);
+  const setChatRailKind = useUIStore((state) => state.setChatRailKind);
+  const conversationMapVisibility = useUIStore((state) => state.conversationMapVisibility);
+  const setConversationMapVisibility = useUIStore((state) => state.setConversationMapVisibility);
   const collapsibleUserMessages = useUIStore((state) => state.collapsibleUserMessages);
   const setCollapsibleUserMessages = useUIStore((state) => state.setCollapsibleUserMessages);
   const stickyUserHeader = useUIStore((state) => state.stickyUserHeader);
@@ -127,6 +145,8 @@ const MessagesTab: React.FC = () => {
   const userMessageOptions = useChipOptions(USER_MESSAGE_RENDERING_OPTIONS);
   const mermaidOptions = useChipOptions(MERMAID_RENDERING_OPTIONS);
   const diffLayoutOptions = useChipOptions(DIFF_LAYOUT_OPTIONS);
+  const chatRailOptions = useChipOptions(CHAT_RAIL_OPTIONS);
+  const conversationMapOptions = useChipOptions(CONVERSATION_MAP_VISIBILITY_OPTIONS);
 
   const handleActivityRenderModeChange = (mode: 'collapsed' | 'summary') => {
     setActivityRenderMode(mode);
@@ -240,16 +260,46 @@ const MessagesTab: React.FC = () => {
           ariaLabel={t('settings.openchamber.visual.field.stickyUserHeaderAria')}
           settingsItem="chat.sticky-user-header"
         />
-        <SettingsCheckboxRow
-          checked={promptNavigatorEnabled}
-          onChange={(enabled) => {
-            setPromptNavigatorEnabled(enabled);
-            void updateDesktopSettings({ promptNavigatorEnabled: enabled });
-          }}
-          label={t('settings.openchamber.visual.field.promptNavigatorEnabled')}
-          ariaLabel={t('settings.openchamber.visual.field.promptNavigatorEnabledAria')}
+        {/* Fork (OCH-047): one rail at a time. Off is upstream's
+            `promptNavigatorEnabled`, so its shortcut gate stays as it is. */}
+        <SettingsFieldRow
+          label={t('settings.openchamber.visual.field.chatRail')}
           settingsItem="chat.prompt-navigator"
-        />
+        >
+          <SettingsChipGroup
+            value={promptNavigatorEnabled ? chatRailKind : 'off'}
+            options={chatRailOptions}
+            onChange={(value) => {
+              if (value === 'off') {
+                setPromptNavigatorEnabled(false);
+                void updateDesktopSettings({ promptNavigatorEnabled: false });
+                return;
+              }
+              setPromptNavigatorEnabled(true);
+              setChatRailKind(value);
+              void updateDesktopSettings({ promptNavigatorEnabled: true, chatRailKind: value });
+            }}
+            aria-label={t('settings.openchamber.visual.field.chatRailAria')}
+          />
+        </SettingsFieldRow>
+        {/* The map belongs to the timeline rail, and stays reachable whatever
+            rail shows (Oscar, 2026-10-22), so it is indented rather than hidden. */}
+        <SettingsFieldRow
+          className={NESTED_OPTION_CLASS}
+          label={t('settings.openchamber.visual.field.conversationMapVisibility')}
+          info={t('settings.openchamber.visual.field.conversationMapVisibilityInfo')}
+          settingsItem="chat.conversation-map"
+        >
+          <SettingsChipGroup
+            value={conversationMapVisibility}
+            options={conversationMapOptions}
+            onChange={(value) => {
+              setConversationMapVisibility(value);
+              void updateDesktopSettings({ conversationMapVisibility: value });
+            }}
+            aria-label={t('settings.openchamber.visual.field.conversationMapVisibilityAria')}
+          />
+        </SettingsFieldRow>
         <SettingsCheckboxRow
           checked={showSplitAssistantMessageActions}
           onChange={(enabled) => {

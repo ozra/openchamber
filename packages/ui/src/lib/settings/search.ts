@@ -358,8 +358,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
   {
     id: 'chat.prompt-navigator',
     page: 'chat',
-    titleKey: 'settings.openchamber.visual.field.promptNavigatorEnabled',
-    keywords: ['prompt', 'navigator', 'navigation', 'timeline', 'scroll'],
+    titleKey: 'settings.openchamber.visual.field.chatRail',
+    keywords: ['prompt', 'navigator', 'navigation', 'timeline', 'rail', 'scroll'],
+  },
+  {
+    id: 'chat.conversation-map',
+    page: 'chat',
+    titleKey: 'settings.openchamber.visual.field.conversationMapVisibility',
+    keywords: ['timeline', 'rail', 'map', 'preview', 'excerpt', 'hover', 'minimap'],
   },
   {
     id: 'chat.collapsible-user-messages',
@@ -615,18 +621,18 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     keywords: ['in work', 'in progress', 'track', 'done', 'inbox', 'sidebar', 'recent', 'jev'],
   },
   {
-    id: 'sessions.work-enabled',
-    page: 'sessions',
-    titleKey: 'settings.openchamber.sessionWork.field.enabled',
-    keywords: ['in work', 'in progress', 'track', 'done', 'sidebar'],
-  },
-  {
     id: 'sessions.show-archive-button',
     page: 'sessions',
     titleKey: 'settings.openchamber.sidebar.showArchiveButton',
     descriptionKey: 'settings.openchamber.sidebar.showArchiveButtonInfo',
     keywords: ['archive', 'delete', 'shift', 'sidebar', 'row', 'button', 'hide', 'show'],
     isAvailable: (ctx) => !ctx.isMobile,
+  },
+  {
+    id: 'sessions.work-enabled',
+    page: 'sessions',
+    titleKey: 'settings.openchamber.sessionWork.field.enabled',
+    keywords: ['in work', 'in progress', 'track', 'done', 'sidebar'],
   },
   {
     id: 'sessions.small-model',

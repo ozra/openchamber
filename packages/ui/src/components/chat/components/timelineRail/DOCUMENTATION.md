@@ -1,15 +1,16 @@
 # Timeline rail
 
-Fork-owned (OCH-001). The rail on the chat's end edge: one span per prompt, reply text, thinking block, tool call and system record, laid out like a minimap of the transcript, with a frame over the part Chat shows. It replaces `PromptNavigatorRail` at its one mount point in `ChatViewport` (`ChatContainer.tsx`); the upstream file stays in the repo unmounted, listed as a Knip entry, so upstream changes to it can be compared and ported.
+Fork-owned (OCH-001). The rail on the chat's end edge: one span per prompt, reply text, thinking block, tool call and system record, laid out like a minimap of the transcript, with a frame over the part Chat shows. It shares upstream's `PromptNavigatorRail` mount point in `ChatViewport` (`ChatContainer.tsx`): `chatRailKind` (OCH-047, `chatRailKind.ts`) picks one of the two while `promptNavigatorEnabled` is on, so the toggle shortcut always drives the rail that shows. The upstream rail stays unmodified, so upstream changes to it can be compared and ported.
 
 ## Ownership
 
 - `projectRailSpans.ts` turns the list's rows into spans: kind, lane, content size, stable ids, preview text.
 - `layoutRailSpans.ts` owns the span-length formula, the placement of spans on the rail, and the pointer lookup.
 - `layoutConversationMap.ts` picks the conversation map's boxes (OCH-044): every prompt and reply, thinned where they would overlap, with dots for the ones left out. `ConversationMap.tsx` paints them.
+- `conversationMapVisibility.ts` owns when those boxes show (OCH-046) and the widths the map and the dimming blanket share.
 - `TimelineRail.tsx` reads the list, subscribes to its position updates, paints spans and the frame, and handles hover, click, keyboard and load-earlier.
 
-The rail owns no transcript data. Rows and their positions come from `MessageList` through `MessageListHandle.getTimelineLayout()`. A prompt jumps through the timeline controller (`onSelectTurn`); every other span through `onSelectMessage` in `ChatContainer`, which unfolds the message's turn (`MessageListHandle.revealFoldedMessage`, plus `requestReasoningReveal` for a Thinking span), releases live follow and asks the list for the message (see the decision below). Reasoning spans follow the "Show reasoning traces" setting, as Chat does. The setting (`promptNavigatorEnabled`), the toggle shortcut and `isPromptNavigatorPanelOpen` are the prompt rail's and are reused unchanged.
+The rail owns no transcript data. Rows and their positions come from `MessageList` through `MessageListHandle.getTimelineLayout()`. A prompt jumps through the timeline controller (`onSelectTurn`); every other span through `onSelectMessage` in `ChatContainer`, which unfolds the message's turn (`MessageListHandle.revealFoldedMessage`, plus `requestReasoningReveal` for a Thinking span), releases live follow and asks the list for the message (see the decision below). Reasoning spans follow the "Show reasoning traces" setting, as Chat does. The on/off setting (`promptNavigatorEnabled`), the toggle shortcut and `isPromptNavigatorPanelOpen` are the prompt rail's and are reused unchanged; Settings shows them with `chatRailKind` as one choice, Timeline, Prompt navigator or Off.
 
 ## Invariants
 
@@ -29,7 +30,10 @@ The rail owns no transcript data. Rows and their positions come from `MessageLis
 - Tool and thinking spans are lifted to at least the theme's `--timeline-rail-min-lightness` (OKLCH; `config.timelineRail.minLightness`, otherwise 0 on dark themes and 0.62 on light ones). Prompts and replies stay ink. Engines without relative color syntax paint the plain color.
 - Moving the highlight re-renders only the spans it moves between (`RailSpanMark` is memoized; the ring and the dimming are CSS on `aria-selected` and `data-dimmed`).
 - Span content positions never go back, even when the list reports a stale row position.
-- The conversation map shows exactly while the hover card does, from the pointer or keyboard navigation, and paints below it. It takes no pointer events, so hover, click and wheel stay with the rail and the map closes when the pointer leaves the rail. It renders from the placed spans alone, memoized, so moving the highlight does not re-render it.
+- The conversation map shows while the hover card does, from the pointer or keyboard navigation, and paints below it. It takes no pointer events, so hover, click and wheel stay with the rail and the map closes when the pointer leaves the rail. It renders from the placed spans alone, memoized, so moving the highlight does not re-render it.
+- The `conversationMapVisibility` setting (OCH-046) decides the boxes: `always`, `whenRoom` (all of them, or none, when they do not fit beside the message column) or `off`. The hover card shows on every hover whatever the choice, and the dots go with the boxes. `always` needs no measurement, so the boxes show before the rail has measured the room.
+- The blanket dimming the chat under the map paints at `--surface-background` at 50%, from the rail out to the farthest box, a prompt's. Past that edge it runs 4rem farther and fades to transparent there, so the boxes keep the full dimming and the blanket has no hard edge. It goes with the boxes: it is mounted only while they show and reach over the message column, and never for the hover card alone, which reads clearly enough by itself. It sits below the boxes (`z-10` against `z-20` and the card's `z-30`).
+- `conversationMapVisibility.ts` owns the box widths (box, prompt offset) as both CSS and px. The map and the blanket read them from there, so the room check and what is painted cannot disagree.
 - Map boxes never overlap: prompts are placed first, then each turn's last reply, then the other replies, earlier before later within each group, and a box that collides becomes a dot at its span's position. Prompt boxes sit 2.5rem farther from the rail than reply boxes, both edges, so the map alternates sides like a chat; prompt dots sit farther out than reply dots, as the prompt lane does on the rail.
 
 ## Decisions
@@ -45,6 +49,28 @@ The list knows where each row is, not where a tool call sits inside a turn. The 
 ### Why one pointer target with a nearest-span lookup
 
 Per-span hit elements padded to a minimum size overlap in a long session, where many spans share a few pixels. The whole gutter is one target, as in the prompt rail: the pointer's `y` goes to the nearest span within reach, later spans win ties because they paint on top, and the gap between two spans splits at the midpoint.
+
+### Why the map dims the chat under it instead of the boxes carrying their own fill
+
+The boxes are translucent by design (OCH-044), and over dense chat text the
+messages below competed with the preview lines. A heavier fill per box would
+have had to win over both theme surfaces and would still have left the gaps
+between boxes reading as transcript. One blanket at `--surface-background` over
+the whole stretch the boxes occupy is a single element, reads the same in every
+theme, and dims what the boxes sit on. It is skipped when the boxes do not
+reach over the message column, which is where it would change nothing anyway.
+The hover card gets none: it is one opaque-enough card and reads by itself
+(Oscar, 2026-10-27).
+
+### Why "when there is room" is all the boxes or none
+
+The room beside the message column is measured once per layout, so a partial
+answer would need every box's own width decided in the layout pass. Narrowing
+the boxes with the room also truncates the previews unevenly, which reads as a
+bug rather than as a fit. Hiding the whole map keeps the one line the setting
+has to be judged on: either the map is beside the messages, or it is not. The
+room is measured from the track's own start edge, so the narrow gutter the rail
+falls back to under a wide message column is already accounted for.
 
 ### Why long empty stretches are cut instead of drawn to scale
 

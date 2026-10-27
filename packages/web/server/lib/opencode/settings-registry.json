@@ -366,6 +366,14 @@
       "scope": "profile",
       "perSurface": true
     },
+    "chatRailKind": {
+      "scope": "profile",
+      "perSurface": true
+    },
+    "conversationMapVisibility": {
+      "scope": "profile",
+      "perSurface": true
+    },
     "wideChatLayoutEnabled": {
       "scope": "profile",
       "perSurface": true

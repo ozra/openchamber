@@ -10,6 +10,12 @@ import { useChatColumnActions } from '../../chatColumnSession';
 import type { ChatMessageEntry } from '../../lib/turns/types';
 import type { MessageListHandle, MessageListTimelineLayout } from '../../MessageList';
 import { ConversationMap } from './ConversationMap';
+import {
+    conversationMapBlanketWidth,
+    conversationMapShowsBoxes,
+    resolveConversationMapExtentMetrics,
+    type ConversationMapRoom,
+} from './conversationMapVisibility';
 import { resolveConversationMapMetrics } from './layoutConversationMap';
 import {
     findRailSpanAt,
@@ -56,6 +62,10 @@ const GUTTER_END_OFFSET_PX = 12;
 const LANES_BY_INDEX: readonly RailLane[] = ['start', 'center', 'end'];
 // The hover card stays this far inside the rail's ends, so it never leaves the chat.
 const CARD_EDGE_CLEARANCE = '2.5rem';
+// The blanket under the conversation map, and the stretch past the farthest
+// box over which it fades out.
+const BLANKET_FILL = 'color-mix(in srgb, var(--surface-background) 50%, transparent)';
+const BLANKET_FADE = '4rem';
 // The list header in `ChatContainer` is a fixed `h-12` (3rem) slot above the
 // rows (chat/lib/scroll/DOCUMENTATION.md); row positions start below it.
 const LIST_HEADER_REM = 3;
@@ -329,6 +339,7 @@ export function TimelineRail({
     const showReasoningTraces = useUIStore((state) => state.showReasoningTraces);
     const showReasoningTracesRef = React.useRef(showReasoningTraces);
     showReasoningTracesRef.current = showReasoningTraces;
+    const conversationMapVisibility = useUIStore((state) => state.conversationMapVisibility);
 
     const navRef = React.useRef<HTMLElement | null>(null);
     const trackRef = React.useRef<HTMLDivElement | null>(null);
@@ -341,15 +352,20 @@ export function TimelineRail({
     const metricsRef = React.useRef(metrics);
     metricsRef.current = metrics;
     const [mapMetrics, setMapMetrics] = React.useState(() => resolveConversationMapMetrics(readRootFontPx()));
+    const [mapExtentMetrics, setMapExtentMetrics] = React.useState(() => resolveConversationMapExtentMetrics(readRootFontPx()));
     const [railHeight, setRailHeight] = React.useState(0);
     const toRailRef = React.useRef<RailLayout['toRail'] | null>(null);
     const [highlightedIndex, setHighlightedIndex] = React.useState<number | null>(null);
     const highlightedIndexRef = React.useRef(highlightedIndex);
     highlightedIndexRef.current = highlightedIndex;
     const [isNarrowGutter, setIsNarrowGutter] = React.useState(false);
+    const [mapRoom, setMapRoom] = React.useState<ConversationMapRoom | null>(null);
 
     // Shrink the hit zone whenever the message column reaches under the
     // full-width gutter, so bubble clicks (expand/collapse) stay clickable.
+    // The same read gives the conversation map the room beside the column: its
+    // boxes start at the track's start edge, so the track's own width takes
+    // part of that room.
     React.useEffect(() => {
         const container = navRef.current?.parentElement;
         if (!container) return;
@@ -357,12 +373,26 @@ export function TimelineRail({
             const column = container.querySelector('.chat-message-column');
             if (!column) {
                 setIsNarrowGutter(false);
+                setMapRoom(null);
                 return;
             }
             const containerRect = container.getBoundingClientRect();
             const columnRect = column.getBoundingClientRect();
             const fullGutterLeft = containerRect.right - GUTTER_END_OFFSET_PX - GUTTER_WIDTH_REM * readRootFontPx();
             setIsNarrowGutter(columnRect.right > fullGutterLeft);
+            const track = trackRef.current;
+            const trackWidth = track ? track.getBoundingClientRect().width : GUTTER_WIDTH_REM * readRootFontPx();
+            const railStartEdge = direction === 'rtl'
+                ? containerRect.left + GUTTER_END_OFFSET_PX + trackWidth
+                : containerRect.right - GUTTER_END_OFFSET_PX - trackWidth;
+            const room = Math.round(direction === 'rtl'
+                ? columnRect.left - railStartEdge
+                : railStartEdge - columnRect.right);
+            setMapRoom((previous) => (
+                previous && previous.available === room && previous.viewportWidth === window.innerWidth
+                    ? previous
+                    : { available: room, viewportWidth: window.innerWidth }
+            ));
         };
         measure();
         const observer = new ResizeObserver(measure);
@@ -370,8 +400,10 @@ export function TimelineRail({
         // The wide chat layout moves the message column without resizing the
         // container; the scroller's content box changes with its padding.
         if (scrollRef.current) observer.observe(scrollRef.current);
+        // A narrower gutter narrows the track, which moves its start edge.
+        if (trackRef.current) observer.observe(trackRef.current);
         return () => observer.disconnect();
-    }, [scrollRef]);
+    }, [direction, scrollRef]);
 
     // The frame follows the scroll on every frame without a React render; it
     // maps through the same anchors as the spans. React never writes its
@@ -399,7 +431,9 @@ export function TimelineRail({
         if (!isSameMetrics(metricsRef.current, nextMetrics)) {
             metricsRef.current = nextMetrics;
             setMetrics(nextMetrics);
-            setMapMetrics(resolveConversationMapMetrics(readRootFontPx()));
+            const nextRootFontPx = readRootFontPx();
+            setMapMetrics(resolveConversationMapMetrics(nextRootFontPx));
+            setMapExtentMetrics(resolveConversationMapExtentMetrics(nextRootFontPx));
         }
         const { placed: next, toRail } = layoutRailSpans({
             spans: projectRailSpans(layout.entries, showReasoningTracesRef.current),
@@ -715,6 +749,16 @@ export function TimelineRail({
         '--rail-ring': `${metrics.laneGap}px`,
     }), [metrics]);
 
+    // The two layers the map can add beside the rail, decided from the measured
+    // room and the setting. Both ride the hover card; the blanket goes with the
+    // boxes, and only where they reach over the message column.
+    const mapLayer = React.useMemo(() => ({
+        boxes: conversationMapShowsBoxes(conversationMapVisibility, mapRoom, mapExtentMetrics),
+        blanketWidth: conversationMapBlanketWidth(conversationMapVisibility, mapRoom, mapExtentMetrics),
+    }), [conversationMapVisibility, mapExtentMetrics, mapRoom]);
+    const mapBlanketWidth = highlighted ? mapLayer.blanketWidth : null;
+    const showMapBoxes = highlighted !== undefined && mapLayer.boxes;
+
     return (
         <nav
             ref={navRef}
@@ -798,8 +842,22 @@ export function TimelineRail({
                         width: lanesWidth(metrics) + metrics.laneGap * 2,
                     }}
                 />
+                {/* The chat the map and the card paint over, dimmed so the
+                    boxes read apart from the messages below (OCH-046). It
+                    runs BLANKET_FADE past the farthest box, fading out there,
+                    so the boxes keep the full dimming and the edge is soft. */}
+                {mapBlanketWidth !== null ? (
+                    <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-y-0 inset-e-full z-10"
+                        style={{
+                            width: `calc(${mapBlanketWidth}px + ${BLANKET_FADE})`,
+                            background: `linear-gradient(to ${direction === 'rtl' ? 'left' : 'right'}, transparent, ${BLANKET_FILL} ${BLANKET_FADE})`,
+                        }}
+                    />
+                ) : null}
                 {/* Shown with the card, which paints above it (z-30). */}
-                {highlighted ? (
+                {showMapBoxes ? (
                     <ConversationMap
                         placed={placed}
                         railHeight={railHeight}

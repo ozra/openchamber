@@ -31,6 +31,8 @@ import { LIVE_BROWSER_TABS_MAX, LIVE_BROWSER_TABS_MIN } from '@/lib/browser/live
 import { normalizeMobileKeyboardMode } from '@/lib/mobileKeyboardMode';
 import { isTerminalShell } from '@/lib/terminalShell';
 import { sanitizeWorkStatusHiddenSections, sanitizeWorkStatusSectionOrder } from '@/components/chat/work-status/sections';
+import { CONVERSATION_MAP_VISIBILITIES } from '@/components/chat/components/timelineRail/conversationMapVisibility';
+import { CHAT_RAIL_KINDS } from '@/components/chat/components/timelineRail/chatRailKind';
 import { useInputHistoryStore } from '@/stores/useInputHistoryStore';
 import { useMessageQueueStore } from '@/stores/messageQueueStore';
 import { useSessionDisplayStore } from '@/stores/useSessionDisplayStore';
@@ -429,6 +431,8 @@ export const SETTINGS_REGISTRY = {
   collapsibleUserMessages: field({ scope: 'profile', parse: parseBoolean, ui: uiStore('collapsibleUserMessages', (v) => useUIStore.getState().setCollapsibleUserMessages(v)) }),
   stickyUserHeader: field({ scope: 'profile', perSurface: true, parse: parseBoolean, ui: uiStore('stickyUserHeader', (v) => useUIStore.getState().setStickyUserHeader(v)) }),
   promptNavigatorEnabled: field({ scope: 'profile', perSurface: true, parse: parseBoolean, ui: uiStore('promptNavigatorEnabled', (v) => useUIStore.getState().setPromptNavigatorEnabled(v)) }),
+  chatRailKind: field({ scope: 'profile', perSurface: true, parse: parseOneOf(CHAT_RAIL_KINDS), ui: uiStore('chatRailKind', (v) => useUIStore.getState().setChatRailKind(v)) }),
+  conversationMapVisibility: field({ scope: 'profile', perSurface: true, parse: parseOneOf(CONVERSATION_MAP_VISIBILITIES), ui: uiStore('conversationMapVisibility', (v) => useUIStore.getState().setConversationMapVisibility(v)) }),
   wideChatLayoutEnabled: field({ scope: 'profile', perSurface: true, parse: parseBoolean, ui: uiStore('wideChatLayoutEnabled', (v) => useUIStore.getState().setWideChatLayoutEnabled(v)) }),
   showSplitAssistantMessageActions: field({ scope: 'profile', parse: parseBoolean, ui: uiStore('showSplitAssistantMessageActions', (v) => useUIStore.getState().setShowSplitAssistantMessageActions(v)) }),
   showToolFileIcons: field({ scope: 'profile', parse: parseBoolean, ui: uiStore('showToolFileIcons', (v) => useUIStore.getState().setShowToolFileIcons(v)) }),

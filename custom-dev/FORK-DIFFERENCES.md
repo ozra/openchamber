@@ -135,7 +135,8 @@ the old `TRANSLATE ME` convention were deleted (`de.settings.ts`, `tr.settings.t
 ### 12. Timeline rail replaces the prompt rail (OCH-001, in-progress)
 
 `TimelineRail` (`components/chat/components/timelineRail/`) mounts where
-`PromptNavigatorRail` did and keeps its setting and shortcut. Edits outside that
+`PromptNavigatorRail` does and keeps its setting and shortcut; since OCH-047 a
+setting picks one of the two (item 14). Edits outside that
 folder:
 
 - `ChatContainer.tsx`: the imports, the mount block in `ChatViewport`, and an
@@ -147,8 +148,6 @@ folder:
 - `MessageList.tsx`: `MessageListHandle.getTimelineLayout()` and the
   `MessageListTimelineLayout` type, plus `allEntriesRef` behind it, and
   `MessageListHandle.revealFoldedMessage` (the list's existing function).
-- `knip.json`: `PromptNavigatorRail.tsx` listed as a `packages/ui` entry, since
-  nothing imports it any more.
 - Theme `colors.timelineRail.system` (`--timeline-rail-system`; default
   `#00FFFF` dark, `#0097A7` light) and `config.timelineRail.restOpacity` and `.minLightness`
   (`definition.ts`, `types/theme.ts`), emitted by `cssGenerator.ts` as
@@ -162,6 +161,37 @@ folder:
 
 When upstream changes `PromptNavigatorRail.tsx`, compare it with
 `TimelineRail.tsx` and port what applies.
+
+### 13. Conversation map visibility setting (OCH-046, done)
+
+`conversationMapVisibility` (`registry.ts`, `profile`, `perSurface`), chip values
+`always` (default), `whenRoom`, `off`, choosing when the timeline rail's
+conversation map shows its boxes. The hover card is unaffected.
+
+Edits outside `timelineRail/`: `lib/settings/registry.ts`,
+`lib/settings/search.ts` (`chat.conversation-map`), `stores/useUIStore.ts`,
+`components/sections/openchamber/ChatSettings.tsx` (Reading section, chips
+always visible), `lib/i18n/messages/en.settings.ts` (English only, OCH-039), the
+two generated `settings-registry.json` snapshots, and a value set plus branch in
+`packages/web/server/lib/opencode/settings-helpers.js` with its drift-test sample.
+
+### 14. Timeline rail or prompt navigator (OCH-047, done)
+
+`chatRailKind` (`registry.ts`, `profile`, `perSurface`), `timeline` (default) or
+`prompt`, picks which rail shows while upstream's `promptNavigatorEnabled` is on.
+One rail at a time, so the toggle shortcut and `[data-prompt-rail]` room are
+upstream's, unchanged. `PromptNavigatorRail` is mounted again, unmodified, with
+upstream's two-prompt minimum; the timeline rail keeps showing from the first
+prompt.
+
+Edits: `ChatContainer.tsx` (import and the two mount blocks in `ChatViewport`),
+`knip.json` (the `PromptNavigatorRail.tsx` entry from item 12 removed),
+`ChatSettings.tsx` (the Prompt navigator checkbox becomes a "Chat rail" chip row:
+Timeline, Prompt navigator, Off), `search.ts` (`chat.prompt-navigator` retitled),
+`useUIStore.ts`, `registry.ts`, `en.settings.ts`, the generated snapshots and
+the server sanitizer with its drift sample. Upstream's
+`promptNavigatorEnabled` label keys stay in the dictionaries, unused, to keep
+the locale files untouched.
 
 ## Keeping this current
 

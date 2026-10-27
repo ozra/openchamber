@@ -2,7 +2,12 @@ import React from 'react';
 
 import { cn } from '@/lib/utils';
 
-import { layoutConversationMap, type ConversationMapKind, type ConversationMapMetrics } from './layoutConversationMap';
+import { CONVERSATION_MAP_BOX_WIDTH_CSS, CONVERSATION_MAP_PROMPT_OFFSET_CSS } from './conversationMapVisibility';
+import {
+    layoutConversationMap,
+    type ConversationMapKind,
+    type ConversationMapMetrics,
+} from './layoutConversationMap';
 import type { PlacedRailSpan } from './layoutRailSpans';
 
 type ConversationMapProps = {
@@ -14,9 +19,10 @@ type ConversationMapProps = {
 
 // Prompt boxes sit PROMPT_OFFSET farther from the rail than reply boxes, both
 // edges, so prompts and replies alternate sides like a chat, as the prompt
-// lane sits farthest out on the rail.
-const BOX_WIDTH = 'min(13rem, 100vw - 10.75rem)';
-const PROMPT_OFFSET = '2.5rem';
+// lane sits farthest out on the rail. Both widths come from the module that
+// measures the map's room, so the two cannot drift apart.
+const BOX_WIDTH = CONVERSATION_MAP_BOX_WIDTH_CSS;
+const PROMPT_OFFSET = CONVERSATION_MAP_PROMPT_OFFSET_CSS;
 const DOT_SIZE_REM = 0.1875;
 // Dots sit in the room between the boxes and the rail (`me-3`), a prompt's
 // farther out than a reply's.
