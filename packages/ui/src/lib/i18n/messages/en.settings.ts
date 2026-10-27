@@ -2531,6 +2531,8 @@ export const settingsDict = {
   'settings.sourceControl.transport.anonymous': 'Anonymous HTTPS, read-only',
   'settings.sourceControl.transport.loading': 'Loading repository transport…',
   'settings.openchamber.sidebar.title': 'Sidebar',
+  'settings.openchamber.sidebar.showArchiveButton': 'Show archive button on session rows',
+  'settings.openchamber.sidebar.showArchiveButtonInfo': 'Shows the quick archive button, which becomes Delete while Shift is held. Archive and Delete stay available in session menus when this is off.',
   'settings.openchamber.sidebar.tooltip': 'How the sessions sidebar behaves after you act.',
   'settings.openchamber.visual.field.inputHistoryScope': 'Input history scope',
   'settings.openchamber.visual.field.inputHistoryScopeDescription': 'Choose whether submitted prompts are recalled across all projects connected to this runtime or only in the current session.',

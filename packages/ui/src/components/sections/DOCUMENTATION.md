@@ -4,6 +4,14 @@ One directory per Settings page. `shared/` holds the page chrome and controls
 every page is built from; see `.agents/skills/settings-ui-patterns/SKILL.md` for
 which primitive to reach for.
 
+## Sessions sidebar preferences
+
+The Sessions page's Sidebar section includes "Show archive button on session
+rows" on non-mobile layouts, including VS Code. The checkbox and Settings search
+target share the `sessions.show-archive-button` anchor. It writes the
+`sidebarShowArchiveButton` profile preference for the current surface and defaults
+to off. Mobile Settings omit the control because mobile rows use swipe actions.
+
 ## Autosave on the OpenCode configuration pages
 
 `agents/`, `commands/`, `skills/`, `mcp/`, `plugins/` and `behavior/` edit files

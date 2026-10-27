@@ -373,6 +373,9 @@ export const createSettingsHelpers = (dependencies) => {
     if (candidate.sidebarDetailedZoneRows === true || candidate.sidebarDetailedZoneRows === false) {
       result.sidebarDetailedZoneRows = candidate.sidebarDetailedZoneRows;
     }
+    if (candidate.sidebarShowArchiveButton === true || candidate.sidebarShowArchiveButton === false) {
+      result.sidebarShowArchiveButton = candidate.sidebarShowArchiveButton;
+    }
     // The fork's keep-open pin persists as a shared setting (PRD-014).
     if (candidate.sidebarKeepOpen === true || candidate.sidebarKeepOpen === false) {
       result.sidebarKeepOpen = candidate.sidebarKeepOpen;

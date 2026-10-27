@@ -12,6 +12,32 @@ afterAll(() => {
 });
 
 describe('useSessionDisplayStore worktree sorting', () => {
+  test('hydrates older preferences with the archive button hidden and retains explicit choices', async () => {
+    const initialState = useSessionDisplayStore.getState();
+    const originalStorage = useSessionDisplayStore.persist.getOptions().storage;
+    let stored = JSON.stringify({ version: 10, state: { sidebarViewMode: 'timeline' } });
+    const storage = createJSONStorage<Partial<ReturnType<typeof useSessionDisplayStore.getState>>>(() => ({
+      getItem: () => stored,
+      setItem: (_name, value) => { stored = value; },
+      removeItem: () => { stored = ''; },
+    }));
+    useSessionDisplayStore.persist.setOptions({ storage });
+    try {
+      await useSessionDisplayStore.persist.rehydrate();
+      expect(useSessionDisplayStore.getState().showArchiveButton).toBe(false);
+      for (const value of [true, false]) {
+        useSessionDisplayStore.getState().setShowArchiveButton(value);
+        const saved = stored;
+        useSessionDisplayStore.setState({ showArchiveButton: !value });
+        stored = saved;
+        await useSessionDisplayStore.persist.rehydrate();
+        expect(useSessionDisplayStore.getState().showArchiveButton).toBe(value);
+      }
+    } finally {
+      useSessionDisplayStore.persist.setOptions({ storage: originalStorage });
+      useSessionDisplayStore.setState(initialState);
+    }
+  });
   test('defaults to manual ordering', () => {
     expect(useSessionDisplayStore.getState().worktreeSortOrder).toBe('manual');
   });

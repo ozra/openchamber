@@ -850,6 +850,15 @@ describe('settings helpers', () => {
 });
 
 describe('settings registry gate', () => {
+  it('accepts and returns both session-row archive button choices', () => {
+    const helpers = createTestHelpers();
+    for (const sidebarShowArchiveButton of [false, true]) {
+      const sanitized = helpers.sanitizeSettingsUpdate({ sidebarShowArchiveButton });
+      expect(sanitized).toEqual({ sidebarShowArchiveButton });
+      expect(helpers.formatSettingsResponse(sanitized).sidebarShowArchiveButton).toBe(sidebarShowArchiveButton);
+    }
+    expect(helpers.sanitizeSettingsUpdate({ sidebarShowArchiveButton: 'false' })).toEqual({});
+  });
   const registryPath = join(dirname(testFilePath), 'settings-registry.json');
   const registry = JSON.parse(readFileSync(registryPath, 'utf8'));
   const persistableKeys = Object.entries(registry.fields)
@@ -861,6 +870,7 @@ describe('settings registry gate', () => {
   // stops accepting a key the registry still lists — that is the drift the
   // registry exists to end.
   const validValues = {
+    sidebarShowArchiveButton: false,
     themeId: 'openchamber-dark', locale: 'zh-CN', useSystemTheme: true, themeVariant: 'dark', lightThemeId: 'openchamber-light', darkThemeId: 'openchamber-dark',
     splashBgLight: '#fff', splashFgLight: '#000', splashBgDark: '#000', splashFgDark: '#fff',
     lastDirectory: '/home/testuser/project', homeDirectory: '/home/testuser', opencodeBinary: '/usr/local/bin/opencode',

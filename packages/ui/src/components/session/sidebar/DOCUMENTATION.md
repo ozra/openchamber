@@ -208,6 +208,16 @@ the header and mobile list. Enter explicitly submits the owning form on
 keydown; Escape cancels. IME composition keys keep their text-input behavior,
 and held Enter does not submit repeatedly.
 
+### Why quick archive is opt-in
+
+`useSessionDisplayStore.showArchiveButton` defaults to false to reduce accidental
+one-click archiving. Settings > Sessions > Sidebar can enable it per profile and
+surface through `sidebarShowArchiveButton`. It gates the complete quick action,
+including Shift-to-delete, and every padding calculation for that action. The
+menu button, Track / Done and VS Code's open-in-editor action retain their space
+and behavior. Archive and Delete remain in session menus, and mobile rows and
+swipes are unchanged. Archived buckets never show the quick archive button.
+
 ## Multi-run rows
 
 A multi-run (`lib/multirun/runs.ts`, two or more active members) renders as one
@@ -285,7 +295,7 @@ never `group-focus-within`: a mouse click focuses the row or button, and
 focus moved elsewhere. Row actions revealed on hover are the same three in both views: Track / Done
 (eye in the muted action color like its neighbours / check in
 `status.success`, one icon size up because the glyph draws small), quick
-archive/delete, the menu. Pin/unpin lives in the menu only. Touch layouts (`alwaysShowActions`)
+archive/delete when enabled, the menu. Pin/unpin lives in the menu only. Touch layouts (`alwaysShowActions`)
 keep Track / Done in the menu. At rest a row in work shows a grey check only
 while Jev's done hint is current (`isDoneSuggested`); the composer shows the
 same hint as a top row (`components/chat/SessionDoneHintRow.tsx`). The

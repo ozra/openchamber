@@ -123,6 +123,21 @@ describe('round trip', () => {
 });
 
 describe('per-surface keys', () => {
+  test('round-trips archive button choices independently for each surface', () => {
+    const key = 'sidebarShowArchiveButton';
+    assert.equal(isPerSurfaceSettingsKey(key), true);
+    assert.equal(isProfileSettingsKey(key), true);
+    let fields = buildPreferencesFields({}, { [key]: true }, 1);
+    fields = buildPreferencesFields(fields, { [key]: false }, 2, { surface: 'desktop', changedKeys: [key] });
+    fields = buildPreferencesFields(fields, { [key]: false }, 3, { surface: 'vscode', changedKeys: [key] });
+    const parsed = parsePreferencesDocument(serializePreferencesDocument(fields));
+    assert.ok(parsed.ok);
+    assert.equal(flattenPreferences(parsed.fields, 'desktop')[key], false);
+    assert.equal(flattenPreferences(parsed.fields, 'vscode')[key], false);
+    assert.equal(flattenPreferences(parsed.fields, 'web')[key], true);
+    assert.equal(flattenPreferences(parsed.fields, 'mobile')[key], true);
+    assert.equal(flattenPreferences(parsed.fields)[key], true);
+  });
   const perSurfaceKey = Object.keys(SETTINGS_REGISTRY_FIELDS).find((key) => SETTINGS_REGISTRY_FIELDS[key].perSurface === true);
   const plainProfileKey = Object.keys(SETTINGS_REGISTRY_FIELDS).find(
     (key) => SETTINGS_REGISTRY_FIELDS[key].scope === 'profile' && SETTINGS_REGISTRY_FIELDS[key].perSurface !== true,

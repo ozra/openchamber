@@ -113,6 +113,11 @@ verbatim, a reply spoken in full) do not consult it; they silence the 404 on
 
 ### UI state stores
 
+`useSessionDisplayStore.showArchiveButton` defaults to false, including when an
+older local snapshot omits it. Its local cache preserves explicit true and false
+choices across reloads; `sidebarShowArchiveButton` in the settings registry syncs
+the choice per profile and surface. No stored data conversion is needed.
+
 Sidebar visibility and its persisted width are independent. Opening or closing
 the sidebar never writes a width; only resizing changes the saved choice.
 The initial width is separate from the component's minimum resize width.

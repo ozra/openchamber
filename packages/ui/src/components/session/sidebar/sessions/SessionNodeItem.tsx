@@ -362,7 +362,8 @@ function SessionNodeItemComponent(props: SessionNodeItemProps): React.ReactNode 
     ? 'group-hover:opacity-0'
     : 'group-hover:opacity-0 group-has-[:focus-visible]:opacity-0';
   const showOpenInEditorAction = isVSCode;
-  const showQuickArchiveAction = !archivedBucket && !mobileVariant;
+  const showArchiveButton = useSessionDisplayStore((state) => state.showArchiveButton);
+  const showQuickArchiveAction = showArchiveButton && !archivedBucket && !mobileVariant;
   const sessionWorkEnabled = useUIStore((state) => state.sessionWorkEnabled);
   const sessionRecapEnabled = useUIStore((state) => state.sessionRecapEnabled);
   // Track / Done belongs to top-level project sessions: Chats are plain

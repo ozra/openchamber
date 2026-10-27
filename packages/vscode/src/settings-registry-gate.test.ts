@@ -28,6 +28,13 @@ describe('withoutSecretSettings', () => {
 });
 
 describe('filterPersistableSettingsChanges', () => {
+  test('keeps both archive button choices in the generated registry gate', () => {
+    assert.equal(SETTINGS_REGISTRY_FIELDS.sidebarShowArchiveButton.scope, 'profile');
+    assert.equal(SETTINGS_REGISTRY_FIELDS.sidebarShowArchiveButton.perSurface, true);
+    for (const sidebarShowArchiveButton of [false, true]) {
+      assert.deepEqual(filterPersistableSettingsChanges({ sidebarShowArchiveButton }), { sidebarShowArchiveButton });
+    }
+  });
   test('accepts archived-only retention in the shared instance settings', () => {
     assert.equal(SETTINGS_REGISTRY_FIELDS.sessionRetentionOnlyArchived.scope, 'instance');
     for (const sessionRetentionOnlyArchived of [true, false]) {

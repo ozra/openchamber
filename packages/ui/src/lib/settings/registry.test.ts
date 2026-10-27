@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
 import { useUIStore } from '@/stores/useUIStore';
+import { useSessionDisplayStore } from '@/stores/useSessionDisplayStore';
 import {
   AUTO_SAVE_KEYS,
   DESKTOP_SHELL_KEYS,
@@ -22,6 +23,29 @@ import { renderSettingsRegistrySnapshot, SETTINGS_REGISTRY_SNAPSHOT_PATHS } from
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..');
 
 describe('settings registry', () => {
+  test('round-trips the per-surface archive button preference and preserves omitted values', () => {
+    const initial = useSessionDisplayStore.getState().showArchiveButton;
+    try {
+      expect(useSessionDisplayStore.getInitialState().showArchiveButton).toBe(false);
+      expect(SETTINGS_REGISTRY.sidebarShowArchiveButton.scope).toBe('profile');
+      expect(SETTINGS_REGISTRY.sidebarShowArchiveButton.perSurface).toBe(true);
+      expect(MIRRORED_KEYS).toContain('sidebarShowArchiveButton');
+      for (const value of [true, false]) {
+        const parsed = parseSettingsDocument(JSON.parse(JSON.stringify({ sidebarShowArchiveButton: value })));
+        expect(parsed).toEqual({ sidebarShowArchiveButton: value });
+        if (!parsed) throw new Error('Expected valid settings');
+        applySettingsToStores(parsed);
+        expect(useSessionDisplayStore.getState().showArchiveButton).toBe(value);
+        expect(SETTINGS_REGISTRY.sidebarShowArchiveButton.ui?.read()).toBe(value);
+        applySettingsToStores({});
+        expect(useSessionDisplayStore.getState().showArchiveButton).toBe(value);
+      }
+      expect(parseSettingsDocument({ sidebarShowArchiveButton: 'false' })).toEqual({});
+      expect(parseSettingsDocument({ sidebarShowArchiveButton: null })).toEqual({});
+    } finally {
+      useSessionDisplayStore.getState().setShowArchiveButton(initial);
+    }
+  });
   test('round-trips all large text paste modes through settings and local persistence', async () => {
     const options = useUIStore.persist.getOptions();
     const original = useUIStore.getState();

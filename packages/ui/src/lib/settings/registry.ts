@@ -370,6 +370,16 @@ export const SETTINGS_REGISTRY = {
   sidebarShowWorkSection: field({ scope: 'profile', perSurface: true, parse: parseBoolean, ui: sessionDisplayField('showWorkSection') }),
   sidebarShowPinnedSection: field({ scope: 'profile', perSurface: true, parse: parseBoolean, ui: sessionDisplayField('showPinnedSection') }),
   sidebarDetailedZoneRows: field({ scope: 'profile', perSurface: true, parse: parseBoolean, ui: sessionDisplayField('detailedZoneRows') }),
+  sidebarShowArchiveButton: field({
+    scope: 'profile',
+    perSurface: true,
+    parse: parseBoolean,
+    ui: {
+      read: () => useSessionDisplayStore.getState().showArchiveButton,
+      write: (value) => useSessionDisplayStore.getState().setShowArchiveButton(value),
+      autoSave: false,
+    },
+  }),
   // PRD-014 / PRD-015 (fork): sidebar behaviours upstream does not carry.
   sidebarKeepOpen: field({ scope: 'profile', parse: parseBoolean, ui: uiStore('sidebarKeepOpen', (v) => useUIStore.getState().setSidebarKeepOpen(v)) }),
 

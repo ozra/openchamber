@@ -308,6 +308,10 @@
       "scope": "profile",
       "perSurface": true
     },
+    "sidebarShowArchiveButton": {
+      "scope": "profile",
+      "perSurface": true
+    },
     "sidebarKeepOpen": {
       "scope": "profile"
     },

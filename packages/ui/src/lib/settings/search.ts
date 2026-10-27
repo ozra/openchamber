@@ -621,6 +621,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     keywords: ['in work', 'in progress', 'track', 'done', 'sidebar'],
   },
   {
+    id: 'sessions.show-archive-button',
+    page: 'sessions',
+    titleKey: 'settings.openchamber.sidebar.showArchiveButton',
+    descriptionKey: 'settings.openchamber.sidebar.showArchiveButtonInfo',
+    keywords: ['archive', 'delete', 'shift', 'sidebar', 'row', 'button', 'hide', 'show'],
+    isAvailable: (ctx) => !ctx.isMobile,
+  },
+  {
     id: 'sessions.small-model',
     page: 'sessions',
     titleKey: 'settings.openchamber.defaults.smallModel.title',

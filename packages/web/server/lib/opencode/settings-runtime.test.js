@@ -623,6 +623,25 @@ describe('settings runtime: preferences.json split', () => {
 });
 
 describe('settings runtime: per-surface profile keys', () => {
+  it('persists archive button choices per surface without seeding other surfaces', async () => {
+    const { runtime, tempRoot, cleanup } = await createRuntime({
+      mergePersistedSettings: (current, changes) => ({ ...current, ...changes }),
+    });
+    try {
+      await runtime.persistSettings({ sidebarShowArchiveButton: true }, { surface: 'web' });
+      await runtime.persistSettings({ sidebarShowArchiveButton: false }, { surface: 'desktop' });
+      const stored = JSON.parse(await fsPromises.readFile(path.join(tempRoot, 'preferences.json'), 'utf8'));
+      expect(stored.fields.sidebarShowArchiveButton.surfaces.web.value).toBe(true);
+      expect(stored.fields.sidebarShowArchiveButton.surfaces.desktop.value).toBe(false);
+      expect(stored.fields.sidebarShowArchiveButton.value).toBeUndefined();
+      expect((await runtime.readSettingsFromDisk({ surface: 'web' })).sidebarShowArchiveButton).toBe(true);
+      expect((await runtime.readSettingsFromDisk({ surface: 'desktop' })).sidebarShowArchiveButton).toBe(false);
+      expect((await runtime.readSettingsFromDisk({ surface: 'mobile' })).sidebarShowArchiveButton).toBeUndefined();
+      expect((await runtime.readSettingsFromDisk({ surface: 'vscode' })).sidebarShowArchiveButton).toBeUndefined();
+    } finally {
+      await cleanup();
+    }
+  });
   const readJson = async (filePath) => JSON.parse(await fsPromises.readFile(filePath, 'utf8'));
   // These sequences persist several times; the default stub replaces the
   // document with the changes, the real merge keeps the current document.

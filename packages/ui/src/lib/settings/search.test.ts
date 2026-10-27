@@ -19,6 +19,15 @@ const runtimeCtx = {
 };
 
 describe('settings search', () => {
+  test('finds the session-row archive button on non-mobile surfaces', () => {
+    for (const context of [runtimeCtx, { ...runtimeCtx, isDesktop: true }, { ...runtimeCtx, isVSCode: true }, { ...runtimeCtx, isMobile: true }]) {
+      for (const query of ['archive', 'shift', 'hide']) {
+        const results = buildSettingsSearchResults({ query, runtimeCtx: context, t, getPageTitle: (page) => page });
+        expect(results.find((result) => result.id === 'sessions.show-archive-button')?.page)
+          .toBe(context.isMobile ? undefined : 'sessions');
+      }
+    }
+  });
   test('finds double-paste on every shared Settings surface', () => {
     for (const query of ['double paste', 'ctrl v', 'cmd v']) {
       for (const context of [runtimeCtx, { ...runtimeCtx, isDesktop: true }, { ...runtimeCtx, isVSCode: true }, { ...runtimeCtx, isMobile: true }]) {
